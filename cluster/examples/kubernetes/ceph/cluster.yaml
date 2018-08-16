@@ -64,7 +64,7 @@ spec:
   # set the amount of mons to be started
   mon:
     count: 3
-    allowMultiplePerNode: true
+    allowMultiplePerNode: false
   # enable the ceph dashboard for viewing cluster status
   dashboard:
     enabled: true
@@ -98,11 +98,11 @@ spec:
     nodes:
     # Each node's 'name' field should match their 'kubernetes.io/hostname' label.
     - name: "ip-172-16-27-217.us-east-2.compute.internal"
-#      directories:
-#      - path: "/rook/storage-dir"
+      devices:
+      - name: "nvme3n1"
     - name: "ip-172-16-37-1.us-east-2.compute.internal"
-#      devices:
-#      - name: "sdb"
+      devices:
+      - name: "nvme3n1"
     - name: "ip-172-16-61-22.us-east-2.compute.internal"
-#      devices:
-#      - name: "sdb"
+      devices:
+      - name: "nvme3n1"
