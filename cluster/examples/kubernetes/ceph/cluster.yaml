@@ -70,7 +70,7 @@ spec:
     enabled: true
   network:
     # toggle to use hostNetwork
-    hostNetwork: false
+    hostNetwork: true
   placement:
     # Mons will be scheduled on nodes labeled with 'role=mon-node'
     mon:
