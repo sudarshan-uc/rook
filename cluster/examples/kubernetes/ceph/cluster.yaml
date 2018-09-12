@@ -97,12 +97,12 @@ spec:
     useAllDevices: false
     nodes:
     # Each node's 'name' field should match their 'kubernetes.io/hostname' label.
-    - name: "ip-172-16-27-217.us-east-2.compute.internal"
+    - name: "osd1"
       devices:
-      - name: "nvme3n1"
-    - name: "ip-172-16-37-1.us-east-2.compute.internal"
+      - name: "sdd"
+    - name: "osd2"
       devices:
-      - name: "nvme3n1"
-    - name: "ip-172-16-61-22.us-east-2.compute.internal"
+      - name: "sdd"
+    - name: "osd3"
       devices:
-      - name: "nvme3n1"
+      - name: "sdd"
