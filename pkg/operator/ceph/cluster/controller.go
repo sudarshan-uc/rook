@@ -253,6 +253,9 @@ func (c *ClusterController) onAdd(obj interface{}) {
 	osdChecker := osd.NewMonitor(c.context, cluster.Namespace)
 	go osdChecker.Start(cluster.stopCh)
 
+	// Watch for new nodes in the cluster
+	go k8sutil.WatchForNodesAdded(c.context.Clientset, c.triggerOrchestration(), cluster.stopCh)
+
 	// add the finalizer to the crd
 	err = c.addFinalizer(clusterObj)
 	if err != nil {

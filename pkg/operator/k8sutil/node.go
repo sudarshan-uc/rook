@@ -19,11 +19,13 @@ package k8sutil
 
 import (
 	"fmt"
+	"time"
 
 	rookalpha "github.com/rook/rook/pkg/apis/rook.io/v1alpha2"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
 	helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/kubelet/apis"
@@ -143,4 +145,39 @@ func GetNodeHostNames(clientset kubernetes.Interface) (map[string]string, error)
 		nodeMap[node.Name] = node.Labels[apis.LabelHostname]
 	}
 	return nodeMap, nil
+}
+
+// WatchForNodesAdded will call the callback when a new node is detected in the cluster
+func WatchForNodesAdded(clientset kubernetes.Interface, callback func(), done <-chan struct{}) {
+
+	for {
+		w, err := clientset.CoreV1().Nodes().Watch(metav1.ListOptions{})
+		if err != nil {
+			logger.Warningf("failed to start watch on node additions, trying again in a minute. %+v", err)
+			time.Sleep(60 * time.Second)
+			continue
+		}
+		defer w.Stop()
+
+	ResultLoop:
+		for {
+			select {
+			case e, ok := <-w.ResultChan():
+				if !ok {
+					logger.Infof("node watch channel closed, will restart watch.")
+					w.Stop()
+					<-time.After(5 * time.Second)
+					break ResultLoop
+				}
+				if e.Type == watch.Added {
+					n := e.Object.(*v1.Node)
+					logger.Infof("node added: %s", n.Name)
+					callback()
+				}
+			case <-done:
+				logger.Infof("done watching for nodes added")
+				return
+			}
+		}
+	}
 }
