@@ -36,7 +36,7 @@ func init() {
 }
 
 func initPlugin(cmd *cobra.Command, args []string) error {
-	fmt.Println(`{"status":"Success", "capabilities": {"attach": false}}`)
+	fmt.Println(`{"status":"Success", "capabilities": {"attach": false, "fsGroup": false, "selinuxRelabel": false}}`)
 	os.Exit(0)
 	return nil
 }
