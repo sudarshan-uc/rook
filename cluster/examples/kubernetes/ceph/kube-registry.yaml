@@ -19,6 +19,9 @@ spec:
         version: v0
         kubernetes.io/cluster-service: "true"
     spec:
+      securityContext:
+        runAsUser: 1000
+        fsGroup: 2000
       containers:
       - name: registry
         image: registry:2

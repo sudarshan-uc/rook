@@ -41,6 +41,8 @@ spec:
         app: wordpress
         tier: mysql
     spec:
+      securityContext:
+        fsGroup: 2000
       containers:
       - image: mysql:5.6
         name: mysql
