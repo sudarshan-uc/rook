@@ -32,6 +32,12 @@ import (
 
 var cephConfigDir = "/var/lib/ceph"
 
+const (
+	osdsPerDeviceFlag = "--osds-per-device"
+	encryptedFlag     = "--dmcrypt"
+	cephVolumeCmd     = "ceph-volume"
+)
+
 func (a *OsdAgent) configureDevices(context *clusterd.Context, devices *DeviceOsdMapping) ([]oposd.OSDInfo, bool, error) {
 	var osds []oposd.OSDInfo
 
@@ -57,12 +63,30 @@ func (a *OsdAgent) configureDevices(context *clusterd.Context, devices *DeviceOs
 		return nil, true, fmt.Errorf("failed to generate osd keyring. %+v", err)
 	}
 
+	if err = a.initializeDevices(context, devices); err != nil {
+		return nil, true, fmt.Errorf("failed to initialize devices. %+v", err)
+	}
+
+	osds, err = getCephVolumeOSDs(context, a.cluster.Name)
+	return osds, true, err
+}
+
+func (a *OsdAgent) initializeDevices(context *clusterd.Context, devices *DeviceOsdMapping) error {
 	storeFlag := "--bluestore"
 	if a.storeConfig.StoreType == config.Filestore {
 		storeFlag = "--filestore"
 	}
 
-	volumeArgs := []string{"lvm", "batch", "--prepare", storeFlag, "--yes"}
+	baseArgs := []string{"lvm", "batch", "--prepare", storeFlag, "--yes"}
+	if a.storeConfig.EncryptedDevice {
+		baseArgs = append(baseArgs, encryptedFlag)
+	}
+
+	batchArgs := append(baseArgs, []string{
+		osdsPerDeviceFlag,
+		strconv.Itoa(a.storeConfig.OSDsPerDevice),
+	}...)
+
 	configured := 0
 	for name, device := range devices.Entries {
 		if device.LegacyPartitionsFound {
@@ -72,26 +96,39 @@ func (a *OsdAgent) configureDevices(context *clusterd.Context, devices *DeviceOs
 
 		if device.Data == -1 {
 			logger.Infof("configuring new device %s", name)
-			volumeArgs = append(volumeArgs, path.Join("/dev", name))
-			configured++
+			deviceArg := path.Join("/dev", name)
+			if device.Config.OSDsPerDevice <= 1 {
+				// the device will be configured as a batch at the end of the method
+				batchArgs = append(batchArgs, deviceArg)
+				configured++
+			} else {
+				// execute ceph-volume immediately with the device-specific setting instead of batching up multiple devices together
+				immediateExecuteArgs := append(baseArgs, []string{
+					deviceArg,
+					osdsPerDeviceFlag,
+					strconv.Itoa(device.Config.OSDsPerDevice),
+				}...)
+
+				if err := context.Executor.ExecuteCommand(false, "", cephVolumeCmd, immediateExecuteArgs...); err != nil {
+					return fmt.Errorf("failed ceph-volume. %+v", err)
+				}
+
+			}
 		} else {
 			logger.Infof("skipping device %s with osd %d already configured", name, device.Data)
 		}
 	}
 
 	if configured > 0 {
-		err = context.Executor.ExecuteCommand(false, "", "ceph-volume", volumeArgs...)
-		if err != nil {
-			return osds, true, fmt.Errorf("failed ceph-volume. %+v", err)
+		if err := context.Executor.ExecuteCommand(false, "", cephVolumeCmd, batchArgs...); err != nil {
+			return fmt.Errorf("failed ceph-volume. %+v", err)
 		}
 	}
 
-	osds, err = getCephVolumeOSDs(context, a.cluster.Name)
-	return osds, true, err
+	return nil
 }
-
 func getCephVolumeSupported(context *clusterd.Context) (bool, error) {
-	_, err := context.Executor.ExecuteCommandWithOutput(false, "", "ceph-volume", "lvm", "batch", "--prepare")
+	_, err := context.Executor.ExecuteCommandWithOutput(false, "", cephVolumeCmd, "lvm", "batch", "--prepare")
 	if err != nil {
 		if cmdErr, ok := err.(*exec.CommandError); ok {
 			exitStatus := cmdErr.ExitStatus()
@@ -109,7 +146,7 @@ func getCephVolumeSupported(context *clusterd.Context) (bool, error) {
 }
 
 func getCephVolumeOSDs(context *clusterd.Context, clusterName string) ([]oposd.OSDInfo, error) {
-	result, err := context.Executor.ExecuteCommandWithOutput(false, "", "ceph-volume", "lvm", "list", "--format", "json")
+	result, err := context.Executor.ExecuteCommandWithOutput(false, "", cephVolumeCmd, "lvm", "list", "--format", "json")
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve ceph-volume results. %+v", err)
 	}

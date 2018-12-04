@@ -109,7 +109,7 @@ func Provision(context *clusterd.Context, agent *OsdAgent) error {
 	logger.Infof("creating and starting the osds")
 
 	// determine the set of devices that can/should be used for OSDs.
-	devices, err := getAvailableDevices(context, agent.devices, agent.metadataDevice, agent.usingDeviceFilter)
+	devices, err := getAvailableDevices(context, agent.devices, agent.metadataDevice)
 	if err != nil {
 		return fmt.Errorf("failed to get available devices. %+v", err)
 	}
@@ -175,15 +175,11 @@ func Provision(context *clusterd.Context, agent *OsdAgent) error {
 	return nil
 }
 
-func getAvailableDevices(context *clusterd.Context, desiredDevices string, metadataDevice string, usingDeviceFilter bool) (*DeviceOsdMapping, error) {
-	var deviceList []string
-	if !usingDeviceFilter {
-		deviceList = strings.Split(desiredDevices, ",")
-	}
+func getAvailableDevices(context *clusterd.Context, desiredDevices []DesiredDevice, metadataDevice string) (*DeviceOsdMapping, error) {
 
 	available := &DeviceOsdMapping{Entries: map[string]*DeviceOsdIDEntry{}}
 
-	if oposd.IsRemovingNode(desiredDevices) {
+	if isRemovingNode(desiredDevices) {
 		// the node is being removed, just return an empty set
 		return available, nil
 	}
@@ -206,29 +202,32 @@ func getAvailableDevices(context *clusterd.Context, desiredDevices string, metad
 		if metadataDevice != "" && metadataDevice == device.Name {
 			// current device is desired as the metadata device
 			available.Entries[device.Name] = &DeviceOsdIDEntry{Data: unassignedOSDID, Metadata: []int{}, LegacyPartitionsFound: ownPartitions}
-		} else if desiredDevices == "all" {
+		} else if len(desiredDevices) == 1 && desiredDevices[0].Name == "all" {
 			// user has specified all devices, use the current one for data
 			available.Entries[device.Name] = &DeviceOsdIDEntry{Data: unassignedOSDID, LegacyPartitionsFound: ownPartitions}
-		} else if desiredDevices != "" {
+		} else if len(desiredDevices) > 0 {
 			var matched bool
 			var err error
-			if usingDeviceFilter {
-				// the desired devices is a regular expression
-				matched, err = regexp.Match(desiredDevices, []byte(device.Name))
-			} else {
-				for i := range deviceList {
-					if device.Name == deviceList[i] {
-						matched = true
-						break
-					}
+			var matchedDevice DesiredDevice
+			for _, desiredDevice := range desiredDevices {
+				if desiredDevice.IsFilter {
+					// the desired devices is a regular expression
+					matched, err = regexp.Match(desiredDevice.Name, []byte(device.Name))
+				}
+				if device.Name == desiredDevice.Name {
+					matched = true
+				}
+				matchedDevice = desiredDevice
+				if matched {
+					break
 				}
 			}
 
 			if err == nil && matched {
 				// the current device matches the user specifies filter/list, use it for data
-				available.Entries[device.Name] = &DeviceOsdIDEntry{Data: unassignedOSDID}
+				available.Entries[device.Name] = &DeviceOsdIDEntry{Data: unassignedOSDID, Config: matchedDevice}
 			} else {
-				logger.Infof("skipping device %s that does not match the device filter/list `%s`. %+v", device.Name, desiredDevices, err)
+				logger.Infof("skipping device %s that does not match the device filter/list (%v). %+v", device.Name, desiredDevices, err)
 			}
 		} else {
 			logger.Infof("skipping device %s until the admin specifies it can be used by an osd", device.Name)
@@ -236,6 +235,13 @@ func getAvailableDevices(context *clusterd.Context, desiredDevices string, metad
 	}
 
 	return available, nil
+}
+
+func isRemovingNode(devices []DesiredDevice) bool {
+	if len(devices) != 1 {
+		return false
+	}
+	return oposd.IsRemovingNode(devices[0].Name)
 }
 
 func getDataDirs(context *clusterd.Context, kv *k8sutil.ConfigMapKVStore, desiredDirs string,
@@ -294,7 +300,7 @@ func getRemovedDevices(agent *OsdAgent) (*config.PerfScheme, *DeviceOsdMapping, 
 	removedDevicesScheme := config.NewPerfScheme()
 	removedDevicesMapping := &DeviceOsdMapping{Entries: map[string]*DeviceOsdIDEntry{}}
 
-	if !oposd.IsRemovingNode(agent.devices) {
+	if !isRemovingNode(agent.devices) {
 		// TODO: support more removed device scenarios beyond just entire node removal
 		return removedDevicesScheme, removedDevicesMapping, nil
 	}
