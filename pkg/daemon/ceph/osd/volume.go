@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"path"
 	"strconv"
-	"strings"
 	"syscall"
 
 	"github.com/rook/rook/pkg/clusterd"
@@ -150,6 +149,7 @@ func getCephVolumeOSDs(context *clusterd.Context, clusterName string) ([]oposd.O
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve ceph-volume results. %+v", err)
 	}
+	logger.Debug(result)
 
 	var cephVolumeResult map[string][]osdInfo
 	err = json.Unmarshal([]byte(result), &cephVolumeResult)
@@ -168,7 +168,7 @@ func getCephVolumeOSDs(context *clusterd.Context, clusterName string) ([]oposd.O
 		isFilestore := false
 		for _, osd := range osdInfo {
 			osdFSID = osd.Tags.OSDFSID
-			if strings.HasPrefix(osd.Path, "/dev/ceph-filestore") {
+			if osd.Type == "journal" {
 				isFilestore = true
 			}
 		}
@@ -196,6 +196,8 @@ type osdInfo struct {
 	Name string  `json:"name"`
 	Path string  `json:"path"`
 	Tags osdTags `json:"tags"`
+	// "data" or "journal" for filestore and "block" for bluestore
+	Type string `json:"type"`
 }
 
 type osdTags struct {

@@ -157,7 +157,7 @@ func (a *OsdAgent) configureAllDevices(context *clusterd.Context, devices *Devic
 		return osds, nil
 	}
 
-	// get info about legacy OSDs prepared without ceph-volume
+	// If ceph-volume is not supported, go ahead and configure the osds natively with rook
 
 	// compute an OSD layout scheme that will optimize performance
 	scheme, err := a.getPartitionPerfScheme(context, devices)

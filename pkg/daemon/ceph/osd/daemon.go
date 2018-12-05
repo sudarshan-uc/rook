@@ -39,11 +39,7 @@ var (
 )
 
 // StartOSD starts an OSD on a device that was provisioned by ceph-volume
-func StartOSD(context *clusterd.Context, bluestore bool, osdID, osdUUID string, cephArgs []string) error {
-	storeFlag := "--bluestore"
-	if !bluestore {
-		storeFlag = "--filestore"
-	}
+func StartOSD(context *clusterd.Context, osdType, osdID, osdUUID string, cephArgs []string) error {
 
 	// ensure the config mount point exists
 	configDir := fmt.Sprintf("/var/lib/ceph/osd/ceph-%s", osdID)
@@ -53,6 +49,7 @@ func StartOSD(context *clusterd.Context, bluestore bool, osdID, osdUUID string, 
 	}
 
 	// activate the osd with ceph-volume
+	storeFlag := "--" + osdType
 	if err := context.Executor.ExecuteCommand(false, "", "ceph-volume", "lvm", "activate", "--no-systemd", storeFlag, osdID, osdUUID); err != nil {
 		return fmt.Errorf("failed to activate osd. %+v", err)
 	}

@@ -72,7 +72,7 @@ var (
 	mountPath           string
 	osdID               int
 	copyBinariesPath    string
-	bluestoreOSD        bool
+	osdStoreType        string
 	osdStringID         string
 	osdUUID             string
 	osdIsDevice         bool
@@ -104,7 +104,7 @@ func addOSDFlags(command *cobra.Command) {
 	// flags for running osds that were provisioned by ceph-volume
 	osdStartCmd.Flags().StringVar(&osdStringID, "osd-id", "", "the osd ID")
 	osdStartCmd.Flags().StringVar(&osdUUID, "osd-uuid", "", "the osd UUID")
-	osdStartCmd.Flags().BoolVar(&bluestoreOSD, "bluestore", false, "whether the osd is bluestore")
+	osdStartCmd.Flags().StringVar(&osdStoreType, "osd-store-type", "", "whether the osd is bluestore or filestore")
 
 	// add the subcommands to the parent osd command
 	osdCmd.AddCommand(osdConfigCmd)
@@ -147,7 +147,7 @@ func init() {
 
 // Start the osd daemon if provisioned by ceph-volume
 func startOSD(cmd *cobra.Command, args []string) error {
-	required := []string{"osd-id", "osd-uuid"}
+	required := []string{"osd-id", "osd-uuid", "osd-store-type"}
 	if err := flags.VerifyRequiredFlags(osdStartCmd, required); err != nil {
 		return err
 	}
@@ -155,7 +155,7 @@ func startOSD(cmd *cobra.Command, args []string) error {
 	commonOSDInit(osdStartCmd)
 
 	context := createContext()
-	err := osddaemon.StartOSD(context, bluestoreOSD, osdStringID, osdUUID, args)
+	err := osddaemon.StartOSD(context, osdStoreType, osdStringID, osdUUID, args)
 	if err != nil {
 		rook.TerminateFatal(err)
 	}

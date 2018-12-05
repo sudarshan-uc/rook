@@ -113,6 +113,11 @@ func (c *Cluster) makeDeployment(nodeName string, devices []rookalpha.Device, se
 		return nil, fmt.Errorf("empty volumes")
 	}
 
+	storeType := config.Bluestore
+	if osd.IsFileStore {
+		storeType = config.Filestore
+	}
+
 	osdID := strconv.Itoa(osd.ID)
 	tiniEnvVar := v1.EnvVar{Name: "TINI_SUBREAPER", Value: ""}
 	envVars := []v1.EnvVar{
@@ -125,7 +130,7 @@ func (c *Cluster) makeDeployment(nodeName string, devices []rookalpha.Device, se
 	envVars = append(envVars, []v1.EnvVar{
 		{Name: "ROOK_OSD_UUID", Value: osd.UUID},
 		{Name: "ROOK_OSD_ID", Value: osdID},
-		{Name: "ROOK_BLUESTORE", Value: strconv.FormatBool(!osd.IsFileStore)},
+		{Name: "ROOK_OSD_STORE_TYPE", Value: storeType},
 	}...)
 	configEnvVars := append(c.getConfigEnvVars(storeConfig, dataDir, nodeName, location), []v1.EnvVar{
 		tiniEnvVar,

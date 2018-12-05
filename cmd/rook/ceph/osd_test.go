@@ -44,7 +44,7 @@ func TestParseDesiredDevices(t *testing.T) {
 	assert.NotNil(t, err)
 
 	// 0 osd count is not allowed
-	devices = "nvme01:-5"
+	devices = "nvme01:0"
 	result, err = parseDevices(devices)
 	assert.Nil(t, result)
 	assert.NotNil(t, err)
