@@ -117,13 +117,6 @@ func Provision(context *clusterd.Context, agent *OsdAgent) error {
 		return fmt.Errorf("failed to get removed devices: %+v", err)
 	}
 
-	// determine the set of directories that can/should be used for OSDs, with the default dir if no devices were specified. save off the node's crush name if needed.
-	devicesSpecified := len(agent.devices) > 0
-	dirs, removedDirs, err := getDataDirs(context, agent.kv, agent.directories, devicesSpecified, agent.nodeName)
-	if err != nil {
-		return fmt.Errorf("failed to get data dirs. %+v", err)
-	}
-
 	// orchestration is about to start, update the status
 	status = oposd.OrchestrationStatus{Status: oposd.OrchestrationStatusOrchestrating}
 	if err := oposd.UpdateNodeStatus(agent.kv, agent.nodeName, status); err != nil {
@@ -135,6 +128,14 @@ func Provision(context *clusterd.Context, agent *OsdAgent) error {
 	deviceOSDs, err := agent.configureAllDevices(context, devices)
 	if err != nil {
 		return fmt.Errorf("failed to configure devices. %+v", err)
+	}
+
+	// determine the set of directories that can/should be used for OSDs, with the default dir if no devices were specified. save off the node's crush name if needed.
+	logger.Infof("devices = %+v", deviceOSDs)
+	devicesConfigured := len(deviceOSDs) > 0
+	dirs, removedDirs, err := getDataDirs(context, agent.kv, agent.directories, devicesConfigured, agent.nodeName)
+	if err != nil {
+		return fmt.Errorf("failed to get data dirs. %+v", err)
 	}
 
 	// start up the OSDs for directories

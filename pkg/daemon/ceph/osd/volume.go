@@ -139,7 +139,7 @@ func getCephVolumeSupported(context *clusterd.Context) (bool, error) {
 	if err != nil {
 		if cmdErr, ok := err.(*exec.CommandError); ok {
 			exitStatus := cmdErr.ExitStatus()
-			if exitStatus == int(syscall.ENOENT) {
+			if exitStatus == int(syscall.ENOENT) || exitStatus == int(syscall.EPERM) {
 				logger.Infof("supported version of ceph-volume not available")
 				return false, nil
 			}
