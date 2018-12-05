@@ -39,6 +39,10 @@ const (
 
 func (a *OsdAgent) configureDevices(context *clusterd.Context, devices *DeviceOsdMapping) ([]oposd.OSDInfo, bool, error) {
 	var osds []oposd.OSDInfo
+	if a.metadataDevice != "" {
+		logger.Infof("skipping ceph-volume until the fast devices can be specified for the metadata")
+		return osds, false, nil
+	}
 
 	useCephVolume, err := getCephVolumeSupported(context)
 	if err != nil {
@@ -86,6 +90,10 @@ func (a *OsdAgent) initializeDevices(context *clusterd.Context, devices *DeviceO
 		strconv.Itoa(a.storeConfig.OSDsPerDevice),
 	}...)
 
+	// ceph-volume is soon implementing a parameter to specify the "fast devices", which correspond to the "metadataDevice" from the
+	// crd spec. After that is implemented, we can implement this. In the meantime, we fall back to use rook's partitioning.
+	metadataDeviceSpecified := false
+
 	configured := 0
 	for name, device := range devices.Entries {
 		if device.LegacyPartitionsFound {
@@ -96,7 +104,7 @@ func (a *OsdAgent) initializeDevices(context *clusterd.Context, devices *DeviceO
 		if device.Data == -1 {
 			logger.Infof("configuring new device %s", name)
 			deviceArg := path.Join("/dev", name)
-			if device.Config.OSDsPerDevice <= 1 {
+			if metadataDeviceSpecified {
 				// the device will be configured as a batch at the end of the method
 				batchArgs = append(batchArgs, deviceArg)
 				configured++

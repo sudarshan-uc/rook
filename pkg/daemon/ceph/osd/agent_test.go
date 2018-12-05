@@ -255,7 +255,7 @@ func testOSDAgentWithDevicesHelper(t *testing.T, storeConfig config.StoreConfig,
 
 	if !legacyProvisioner {
 		assert.Equal(t, 3, outputExecCount)
-		assert.Equal(t, 1, execCount)
+		assert.Equal(t, 2, execCount)
 	} else if storeConfig.StoreType == config.Bluestore {
 		assert.Equal(t, 12, outputExecCount) // Bluestore has 2 extra output exec calls to get device properties of each device to determine CRUSH weight
 		assert.Equal(t, 5, execCount)        // 1 osd mkfs for sdx, 3 partition steps for sdy, 1 osd mkfs for sdy
