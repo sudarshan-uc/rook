@@ -189,7 +189,7 @@ func (c *ClusterController) onAdd(obj interface{}) {
 
 	if !cluster.Spec.CephVersion.AllowUnsupported {
 		if !versionSupported(cluster.Spec.CephVersion.Name) {
-			logger.Errorf("unsupported ceph version detected: %s. allowUnupported must be set to true to run with this version.", cluster.Spec.CephVersion.Name)
+			logger.Errorf("unsupported ceph version detected: %s. allowUnsupported must be set to true to run with this version.", cluster.Spec.CephVersion.Name)
 			return
 		}
 	}
