@@ -247,10 +247,9 @@ func testOSDAgentWithDevicesHelper(t *testing.T, storeConfig config.StoreConfig,
 		"sdx": {Data: -1},
 		"sdy": {Data: -1},
 	}}
-	_, err = agent.configureAllDevices(context, devices)
+	_, err = agent.configureDevices(context, devices)
 	assert.Nil(t, err)
 
-	assert.Equal(t, int32(0), agent.configCounter)
 	assert.Equal(t, 0, startCount) // 2 OSD procs should be started
 
 	if !legacyProvisioner {
@@ -362,7 +361,6 @@ func TestRemoveDevices(t *testing.T) {
 
 func createTestAgent(t *testing.T, devices, configDir, nodeName string, storeConfig *config.StoreConfig) (*OsdAgent, *exectest.MockExecutor, *clusterd.Context) {
 	location := "root=here"
-	forceFormat := false
 	if storeConfig == nil {
 		storeConfig = &config.StoreConfig{StoreType: config.Bluestore}
 	}
@@ -379,7 +377,7 @@ func createTestAgent(t *testing.T, devices, configDir, nodeName string, storeCon
 	}
 	cluster := &cephconfig.ClusterInfo{Name: "myclust"}
 	context := &clusterd.Context{ConfigDir: configDir, Executor: executor, Clientset: testop.New(1)}
-	agent := NewAgent(context, desiredDevices, "", "", forceFormat, location, *storeConfig,
+	agent := NewAgent(context, desiredDevices, "", "", location, *storeConfig,
 		cluster, nodeName, mockKVStore())
 
 	return agent, executor, context

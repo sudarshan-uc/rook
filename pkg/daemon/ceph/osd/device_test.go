@@ -146,7 +146,7 @@ NAME="sda3" SIZE="20" TYPE="part" PKNAME="sda"`
 
 	// try to format the device.  even though the device has existing partitions, they are owned by rook, so it is safe
 	// to format and the format/partitioning will happen.
-	devInfo, err := formatDevice(context, config, false, storeConfig)
+	devInfo, err := formatDevice(context, config, storeConfig)
 	assert.Nil(t, devInfo)
 	assert.Nil(t, err)
 	assert.Equal(t, 6, outputExecCount)

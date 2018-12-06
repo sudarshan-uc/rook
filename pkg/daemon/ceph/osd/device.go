@@ -103,7 +103,7 @@ func (m *DeviceOsdMapping) String() string {
 }
 
 // format the given device for usage by an OSD
-func formatDevice(context *clusterd.Context, config *osdConfig, forceFormat bool, storeConfig config.StoreConfig) (*devicePartInfo, error) {
+func formatDevice(context *clusterd.Context, config *osdConfig, storeConfig config.StoreConfig) (*devicePartInfo, error) {
 	dataDetails, err := getDataPartitionDetails(config)
 	if err != nil {
 		return nil, err
@@ -116,27 +116,18 @@ func formatDevice(context *clusterd.Context, config *osdConfig, forceFormat bool
 	}
 
 	if !ownPartitions {
-		if forceFormat {
-			logger.Warningf("device %s is being formatted, but has partitions!!", dataDetails.Device)
-		} else {
-			logger.Warningf("device %s has partitions that will not be formatted. Skipping device.", dataDetails.Device)
-		}
+		logger.Warningf("device %s has partitions that will not be formatted. Skipping device.", dataDetails.Device)
 	}
 
 	if devFS != "" {
-		if forceFormat {
-			// there's a filesystem on the device, but the user has specified to force a format. give a warning about that.
-			logger.Warningf("device %s already formatted with %s, but forcing a format!!!", dataDetails.Device, devFS)
-		} else {
-			// disk is already formatted and the user doesn't want to force it, but we require partitioning
-			return nil, fmt.Errorf("device %s already formatted with %s", dataDetails.Device, devFS)
-		}
+		// disk is already formatted but we require partitioning
+		return nil, fmt.Errorf("device %s already formatted with %s", dataDetails.Device, devFS)
 	}
 
 	// format the device
 	dangerousToFormat := !ownPartitions || devFS != ""
 	var devPartInfo *devicePartInfo
-	if !dangerousToFormat || forceFormat {
+	if !dangerousToFormat {
 		devPartInfo, err = partitionOSD(context, config)
 		if err != nil {
 			return nil, fmt.Errorf("failed to partion device %s. %v", dataDetails.Device, err)

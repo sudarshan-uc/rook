@@ -25,6 +25,7 @@ import (
 	"strconv"
 	"strings"
 
+	cephv1 "github.com/rook/rook/pkg/apis/ceph.rook.io/v1"
 	rookalpha "github.com/rook/rook/pkg/apis/rook.io/v1alpha2"
 	opmon "github.com/rook/rook/pkg/operator/ceph/cluster/mon"
 	"github.com/rook/rook/pkg/operator/ceph/cluster/osd/config"
@@ -319,15 +320,28 @@ func (c *Cluster) provisionPodTemplateSpec(devices []rookalpha.Device, selection
 		return nil, fmt.Errorf("empty volumes")
 	}
 
+	legacyProvisioner, cephVolumeProvisioner := c.provisionOSDContainers(
+		devices,
+		selection,
+		resources,
+		storeConfig,
+		metadataDevice,
+		nodeName,
+		location,
+		copyBinariesContainer.VolumeMounts[0])
+
 	podSpec := v1.PodSpec{
 		ServiceAccountName: serviceAccountName,
 		Containers: []v1.Container{
 			*copyBinariesContainer,
-			c.provisionOSDContainer(devices, selection, resources, storeConfig, metadataDevice, nodeName, location, copyBinariesContainer.VolumeMounts[0]),
+			legacyProvisioner,
 		},
 		RestartPolicy: restart,
 		Volumes:       volumes,
 		HostNetwork:   c.HostNetwork,
+	}
+	if cephVolumeProvisioner != nil {
+		podSpec.Containers = append(podSpec.Containers, *cephVolumeProvisioner)
 	}
 	if c.HostNetwork {
 		podSpec.DNSPolicy = v1.DNSClusterFirstWithHostNet
@@ -398,12 +412,13 @@ func (c *Cluster) getConfigEnvVars(storeConfig config.StoreConfig, dataDir, node
 	return envVars
 }
 
-func (c *Cluster) provisionOSDContainer(devices []rookalpha.Device, selection rookalpha.Selection, resources v1.ResourceRequirements,
-	storeConfig config.StoreConfig, metadataDevice, nodeName, location string, copyBinariesMount v1.VolumeMount) v1.Container {
+func (c *Cluster) provisionOSDContainers(devices []rookalpha.Device, selection rookalpha.Selection, resources v1.ResourceRequirements,
+	storeConfig config.StoreConfig, metadataDevice, nodeName, location string, copyBinariesMount v1.VolumeMount) (v1.Container, *v1.Container) {
 
 	envVars := c.getConfigEnvVars(storeConfig, k8sutil.DataDir, nodeName, location)
 	devMountNeeded := false
 	privileged := false
+	cephVolumeProvisioningNeeded := false
 
 	// only 1 of device list, device filter and use all devices can be specified.  We prioritize in that order.
 	if len(devices) > 0 {
@@ -418,17 +433,22 @@ func (c *Cluster) provisionOSDContainer(devices []rookalpha.Device, selection ro
 		}
 		envVars = append(envVars, dataDevicesEnvVar(strings.Join(deviceNames, ",")))
 		devMountNeeded = true
+		cephVolumeProvisioningNeeded = true
 	} else if selection.DeviceFilter != "" {
 		envVars = append(envVars, deviceFilterEnvVar(selection.DeviceFilter))
 		devMountNeeded = true
+		cephVolumeProvisioningNeeded = true
 	} else if selection.GetUseAllDevices() {
 		envVars = append(envVars, deviceFilterEnvVar("all"))
 		devMountNeeded = true
+		cephVolumeProvisioningNeeded = true
 	}
 
 	if metadataDevice != "" {
 		envVars = append(envVars, metadataDeviceEnvVar(metadataDevice))
 		devMountNeeded = true
+		// ceph-volume still has work in progress to be able to specify fast devices for metadata
+		cephVolumeProvisioningNeeded = false
 	}
 
 	volumeMounts := append(opspec.CephVolumeMounts(), copyBinariesMount)
@@ -461,10 +481,38 @@ func (c *Cluster) provisionOSDContainer(devices []rookalpha.Device, selection ro
 	runAsNonRoot := false
 	readOnlyRootFilesystem := false
 
-	return v1.Container{
+	// FIX: We need to test luminous and mimic when the images are available with the latest ceph-volume supported by rook
+	if !cephv1.VersionAtLeast(c.cephVersion.Name, cephv1.Nautilus) {
+		cephVolumeProvisioningNeeded = false
+	}
+
+	if cephVolumeProvisioningNeeded {
+		envVars = append(envVars, v1.EnvVar{Name: "ROOK_SKIP_NEW_DEVICES_IN_LEGACY_PROVISIONER", Value: "true"})
+	}
+
+	provisionContainer := v1.Container{
+		Args:         []string{"ceph", "osd", "pre-provision"},
+		Name:         "provision",
+		Image:        c.rookVersion,
+		VolumeMounts: volumeMounts,
+		Env:          envVars,
+		SecurityContext: &v1.SecurityContext{
+			Privileged:             &privileged,
+			RunAsUser:              &runAsUser,
+			RunAsNonRoot:           &runAsNonRoot,
+			ReadOnlyRootFilesystem: &readOnlyRootFilesystem,
+		},
+		Resources: resources,
+	}
+
+	if !cephVolumeProvisioningNeeded {
+		return provisionContainer, nil
+	}
+
+	return provisionContainer, &v1.Container{
 		Command:      []string{path.Join(rookBinariesMountPath, "tini")},
 		Args:         []string{"--", path.Join(rookBinariesMountPath, "rook"), "ceph", "osd", "provision"},
-		Name:         "provision",
+		Name:         "cvprovision",
 		Image:        c.cephVersion.Image,
 		VolumeMounts: volumeMounts,
 		Env:          envVars,

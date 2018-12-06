@@ -47,17 +47,14 @@ const (
 type OsdAgent struct {
 	cluster        *cephconfig.ClusterInfo
 	nodeName       string
-	forceFormat    bool
 	location       string
 	osdProc        map[int]*proc.MonitoredProc
 	devices        []DesiredDevice
 	metadataDevice string
 	directories    string
-	procMan        *proc.ProcManager
+	skipNewDevices bool
 	storeConfig    config.StoreConfig
 	kv             *k8sutil.ConfigMapKVStore
-	configCounter  int32
-	osdsCompleted  chan struct{}
 }
 
 type device struct {
@@ -65,20 +62,19 @@ type device struct {
 	osdCount int
 }
 
-func NewAgent(context *clusterd.Context, devices []DesiredDevice, metadataDevice, directories string, forceFormat bool,
-	location string, storeConfig config.StoreConfig, cluster *cephconfig.ClusterInfo, nodeName string, kv *k8sutil.ConfigMapKVStore) *OsdAgent {
+func NewAgent(context *clusterd.Context, devices []DesiredDevice, metadataDevice, directories, location string,
+	storeConfig config.StoreConfig, cluster *cephconfig.ClusterInfo, nodeName string, kv *k8sutil.ConfigMapKVStore, skipNewDevices bool) *OsdAgent {
 
 	return &OsdAgent{
 		devices:        devices,
 		metadataDevice: metadataDevice,
 		directories:    directories,
-		forceFormat:    forceFormat,
 		location:       location,
+		skipNewDevices: skipNewDevices,
 		storeConfig:    storeConfig,
 		cluster:        cluster,
 		nodeName:       nodeName,
 		kv:             kv,
-		procMan:        proc.New(context.Executor),
 		osdProc:        make(map[int]*proc.MonitoredProc),
 	}
 }
@@ -145,15 +141,10 @@ func (a *OsdAgent) removeDirs(context *clusterd.Context, removedDirs map[string]
 	return nil
 }
 
-func (a *OsdAgent) configureAllDevices(context *clusterd.Context, devices *DeviceOsdMapping) ([]oposd.OSDInfo, error) {
-
-	// prepare the OSDs with ceph-volume
-	osds, configured, err := a.configureDevices(context, devices)
-	if err != nil {
-		return nil, fmt.Errorf("failed to configure devices with ceph-volume. %+v", err)
-	}
-
-	if devices == nil || len(devices.Entries) == 0 || configured {
+func (a *OsdAgent) configureDevices(context *clusterd.Context, devices *DeviceOsdMapping) ([]oposd.OSDInfo, error) {
+	var osds []oposd.OSDInfo
+	if a.skipNewDevices {
+		// new devices will be handled by ceph-volume in CVAgent.Provision()
 		return osds, nil
 	}
 
@@ -420,7 +411,7 @@ func (a *OsdAgent) prepareOSD(context *clusterd.Context, cfg *osdConfig) (*oposd
 			}
 
 			if !skipFormat {
-				devPartInfo, err = formatDevice(context, cfg, a.forceFormat, a.storeConfig)
+				devPartInfo, err = formatDevice(context, cfg, a.storeConfig)
 				if err != nil {
 					return nil, fmt.Errorf("failed format/partition of osd %d. %+v", cfg.id, err)
 				}

@@ -21,12 +21,12 @@ import (
 	"fmt"
 	"path"
 	"strconv"
-	"syscall"
 
 	"github.com/rook/rook/pkg/clusterd"
+	cephconfig "github.com/rook/rook/pkg/daemon/ceph/config"
 	oposd "github.com/rook/rook/pkg/operator/ceph/cluster/osd"
 	"github.com/rook/rook/pkg/operator/ceph/cluster/osd/config"
-	"github.com/rook/rook/pkg/util/exec"
+	"github.com/rook/rook/pkg/operator/k8sutil"
 )
 
 var cephConfigDir = "/var/lib/ceph"
@@ -37,44 +37,55 @@ const (
 	cephVolumeCmd     = "ceph-volume"
 )
 
-func (a *OsdAgent) configureDevices(context *clusterd.Context, devices *DeviceOsdMapping) ([]oposd.OSDInfo, bool, error) {
+type CVAgent struct {
+	context  *clusterd.Context
+	cluster  *cephconfig.ClusterInfo
+	nodeName string
+	location string
+	kv       *k8sutil.ConfigMapKVStore
+}
+
+func NewCephVolumeAgent(context *clusterd.Context, location string, cluster *cephconfig.ClusterInfo, nodeName string, kv *k8sutil.ConfigMapKVStore) *CVAgent {
+	return &CVAgent{
+		context:  context,
+		location: location,
+		cluster:  cluster,
+		nodeName: nodeName,
+		kv:       kv,
+	}
+}
+
+func (a *CVAgent) Provision() error {
+	// Provision with ceph-volume whatever it is instructed it can consume
+	return nil
+}
+
+func (a *CVAgent) configureDevices(context *clusterd.Context, devices *DeviceOsdMapping) ([]oposd.OSDInfo, error) {
 	var osds []oposd.OSDInfo
-	if a.metadataDevice != "" {
-		logger.Infof("skipping ceph-volume until the fast devices can be specified for the metadata")
-		return osds, false, nil
-	}
-
-	useCephVolume, err := getCephVolumeSupported(context)
-	if err != nil {
-		return nil, false, fmt.Errorf("failed to detect if ceph-volume is available. %+v", err)
-	}
-	if !useCephVolume {
-		return osds, false, nil
-	}
-
+	var err error
 	if devices == nil || len(devices.Entries) == 0 {
 		logger.Infof("no new devices to configure. returning devices already configured with ceph-volume.")
 		osds, err = getCephVolumeOSDs(context, a.cluster.Name)
 		if err != nil {
 			logger.Infof("failed to get devices already provisioned by ceph-volume. %+v", err)
 		}
-		return osds, true, nil
+		return osds, nil
 	}
 
 	err = createOSDBootstrapKeyring(context, a.cluster.Name, cephConfigDir)
 	if err != nil {
-		return nil, true, fmt.Errorf("failed to generate osd keyring. %+v", err)
+		return nil, fmt.Errorf("failed to generate osd keyring. %+v", err)
 	}
 
 	if err = a.initializeDevices(context, devices); err != nil {
-		return nil, true, fmt.Errorf("failed to initialize devices. %+v", err)
+		return nil, fmt.Errorf("failed to initialize devices. %+v", err)
 	}
 
 	osds, err = getCephVolumeOSDs(context, a.cluster.Name)
-	return osds, true, err
+	return osds, err
 }
 
-func (a *OsdAgent) initializeDevices(context *clusterd.Context, devices *DeviceOsdMapping) error {
+func (a *CVAgent) initializeDevices(context *clusterd.Context, devices *DeviceOsdMapping) error {
 	storeFlag := "--bluestore"
 	if a.storeConfig.StoreType == config.Filestore {
 		storeFlag = "--filestore"
@@ -133,23 +144,6 @@ func (a *OsdAgent) initializeDevices(context *clusterd.Context, devices *DeviceO
 	}
 
 	return nil
-}
-func getCephVolumeSupported(context *clusterd.Context) (bool, error) {
-	_, err := context.Executor.ExecuteCommandWithOutput(false, "", cephVolumeCmd, "lvm", "batch", "--prepare")
-	if err != nil {
-		if cmdErr, ok := err.(*exec.CommandError); ok {
-			exitStatus := cmdErr.ExitStatus()
-			if exitStatus == int(syscall.ENOENT) || exitStatus == int(syscall.EPERM) {
-				logger.Infof("supported version of ceph-volume not available")
-				return false, nil
-			}
-			logger.Warningf("unknown return code from ceph-volume when checking for compatibility: %d", exitStatus)
-		}
-		logger.Warningf("unknown ceph-volume failure. %+v", err)
-		return false, nil
-	}
-
-	return true, nil
 }
 
 func getCephVolumeOSDs(context *clusterd.Context, clusterName string) ([]oposd.OSDInfo, error) {

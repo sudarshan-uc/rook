@@ -45,7 +45,6 @@ type config struct {
 	directories        string
 	metadataDevice     string
 	dataDir            string
-	forceFormat        bool
 	location           string
 	cephConfigOverride string
 	storeConfig        osdconfig.StoreConfig

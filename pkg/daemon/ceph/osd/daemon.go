@@ -80,7 +80,7 @@ func RunFilestoreOnDevice(context *clusterd.Context, mountSourcePath, mountPath 
 	return nil
 }
 
-func Provision(context *clusterd.Context, agent *OsdAgent) error {
+func PreProvision(context *clusterd.Context, agent *OsdAgent) error {
 	// set the initial orchestration status
 	status := oposd.OrchestrationStatus{Status: oposd.OrchestrationStatusComputingDiff}
 	if err := oposd.UpdateNodeStatus(agent.kv, agent.nodeName, status); err != nil {
@@ -125,7 +125,7 @@ func Provision(context *clusterd.Context, agent *OsdAgent) error {
 
 	// start the desired OSDs on devices
 	logger.Infof("configuring osd devices: %+v", devices)
-	deviceOSDs, err := agent.configureAllDevices(context, devices)
+	deviceOSDs, err := agent.configureDevices(context, devices)
 	if err != nil {
 		return fmt.Errorf("failed to configure devices. %+v", err)
 	}
