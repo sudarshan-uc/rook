@@ -169,11 +169,11 @@ spec:
   # The path on the host where configuration files will be persisted. If not specified, a kubernetes emptyDir will be created (not recommended).
   # Important: if you reinstall the cluster, make sure you delete this directory from each host or else the mons will fail to start on the new cluster.
   # In Minikube, the '/data' directory is configured to persist across reboots. Use "/data/rook" in Minikube environment.
-  dataDirHostPath: /var/lib/rook
+  dataDirHostPath: /root/rook
   # set the amount of mons to be started
   mon:
     count: 3
-    allowMultiplePerNode: true
+    allowMultiplePerNode: false
   # enable the ceph dashboard for viewing cluster status
   dashboard:
     enabled: true
@@ -193,16 +193,16 @@ spec:
   # To control where various services will be scheduled by kubernetes, use the placement configuration sections below.
   # The example under 'all' would have all services scheduled on kubernetes nodes labeled with 'role=storage-node' and
   # tolerate taints with a key of 'storage-node'.
-#  placement:
-#    all:
-#      nodeAffinity:
-#        requiredDuringSchedulingIgnoredDuringExecution:
-#          nodeSelectorTerms:
-#          - matchExpressions:
-#            - key: role
-#              operator: In
-#              values:
-#              - storage-node
+  placement:
+    all:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+          - matchExpressions:
+            - key: role
+              operator: In
+              values:
+              - storage-node
 #      podAffinity:
 #      podAntiAffinity:
 #      tolerations:
@@ -225,40 +225,16 @@ spec:
 #    mon:
 #    osd:
   storage: # cluster level storage configuration and selection
-    useAllNodes: true
+    useAllNodes: false
     useAllDevices: false
-    deviceFilter:
-    location:
-    config:
-      # The default and recommended storeType is dynamically set to bluestore for devices and filestore for directories.
-      # Set the storeType explicitly only if it is required not to use the default.
-      # storeType: bluestore
-      databaseSizeMB: "1024" # this value can be removed for environments with normal sized disks (100 GB or larger)
-      journalSizeMB: "1024"  # this value can be removed for environments with normal sized disks (20 GB or larger)
-      osdsPerDevice: "1" # this value can be overridden at the node or device level
-# Cluster level list of directories to use for storage. These values will be set for all nodes that have no `directories` set.
-#    directories:
-#    - path: /rook/storage-dir
-# Individual nodes and their config can be specified as well, but 'useAllNodes' above must be set to false. Then, only the named
-# nodes below will be used as storage resources.  Each node's 'name' field should match their 'kubernetes.io/hostname' label.
-#    nodes:
-#    - name: "172.17.4.101"
-#      directories: # specific directories to use for storage can be specified for each node
-#      - path: "/rook/storage-dir"
-#      resources:
-#        limits:
-#          cpu: "500m"
-#          memory: "1024Mi"
-#        requests:
-#          cpu: "500m"
-#          memory: "1024Mi"
-#    - name: "172.17.4.201"
-#      devices: # specific devices to use for storage can be specified for each node
-#      - name: "sdb"
-#      - name: "nvme01" # multiple osds can be created on high performance devices
-#        config:
-#          osdsPerDevice: "5"
-#      config: # configuration can be specified at the node level which overrides the cluster level config
-#        storeType: filestore
-#    - name: "172.17.4.301"
-#      deviceFilter: "^sd."
+    nodes:
+    # Each node's 'name' field should match their 'kubernetes.io/hostname' label.
+    - name: "node04.internal.aws.testdrive.openshift.com"
+      devices:
+      - name: "xvdd"
+    - name: "node05.internal.aws.testdrive.openshift.com"
+      devices:
+      - name: "xvdd"
+    - name: "node06.internal.aws.testdrive.openshift.com"
+      devices:
+      - name: "xvdd"
