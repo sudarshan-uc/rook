@@ -15,8 +15,26 @@ This hands-on workshop is for both system administrators and application develop
 
 == Lab Environment
 
+**To login to your OpenShift lab environment go to this link:**
+
+https://redhat.qwiklabs.com/focuses/254
+
+**Lab Guide:** 
+
+https://github.com/travisn/rook/blob/openshift-commons-demo/workshop/readme.adoc
+
 [NOTE]
-*Your facilitator will provide you with connection details. After you Start Lab you will see login information for your OCP master node. Disregard Lab Guide link, we will not be using.*
+*Your facilitator will provide you with your username and password to login.*
+
+image::qwiklab_login.jpg[]
+
+
+[NOTE]
+*After you 'Start Lab' and then 'End Lab' is completed you will see login information for your OCP master node. Disregard Lab Guide link presented to you above SSHUserName and use Lab Guide above instead.*
+
+image::lab_start.jpg[]
+
+image::lab_end.jpg[]
 
 image::lab_creds.jpg[]
 
@@ -92,7 +110,7 @@ oc get nodes --show-labels | grep storage-node
 Download CRDs scc.yaml, operator.yaml and cluster.yaml and create rook resources. After downloading each CRD view the files using the 'cat' command before creating the resources.
 
 ----
-curl -O https://raw.githubusercontent.com/travisn/rook/openshift-commons-demo/cluster/examples/kubernetes/ceph/scc.yaml
+curl -O https://raw.githubusercontent.com/travisn/rook/openshift-commons-demo/workshop/scc.yaml
 oc create -f scc.yaml
 oc get scc
 oc export scc
@@ -101,7 +119,7 @@ oc export scc
 Validate that rook-ceph has been added to securitycontextconstraints.security.openshift.io.
 
 ----
-curl -O https://raw.githubusercontent.com/travisn/rook/openshift-commons-demo/cluster/examples/kubernetes/ceph/operator.yaml
+curl -O https://raw.githubusercontent.com/travisn/rook/openshift-commons-demo/workshop/operator.yaml
 oc create -f operator.yaml
 oc project rook-ceph-system
 watch oc get pods -o wide
@@ -118,7 +136,7 @@ Next step is to download the cluster.yaml to create Ceph MON, MGR and OSD pods.
 ----
 oc new-project rook-ceph
 oc adm pod-network make-projects-global rook-ceph
-curl -O https://raw.githubusercontent.com/travisn/rook/openshift-commons-demo/cluster/examples/kubernetes/ceph/cluster.yaml
+curl -O https://raw.githubusercontent.com/travisn/rook/openshift-commons-demo/workshop/cluster.yaml
 ----
 
 Take a look at the cluster.yaml file. It specifies the version of Ceph, the label used for the rook resources (role=storage-node) added at the start of this section, and the nodes and storage devices used for OSDs.
@@ -165,7 +183,7 @@ rook-ceph-osd-2-7cc7bdf44d-ncqbr            1/1	      Running     0          1m
 Once all pods are in a Running state it is time to verify that Ceph is operating correctly. Download toolbox.yaml to run Ceph commands.
 
 ----
-curl -O https://raw.githubusercontent.com/travisn/rook/openshift-commons-demo/cluster/examples/kubernetes/ceph/toolbox.yaml
+curl -O https://raw.githubusercontent.com/travisn/rook/openshift-commons-demo/workshop/toolbox.yaml
 oc create -f toolbox.yaml
 ----
 
@@ -187,7 +205,7 @@ Disregard the ‘health: HEALTH_WARN mons a,b,c are low on available space’ me
 In this section you will download storageclass.yaml and then create the OCP storageclass 'rook-ceph-block' that will be used by applications to claim persistent storage. The Ceph pool 'replicapool' is created when the storageclass is created and Ceph commands can validate that pool is created.
 
 ----
-curl -O https://raw.githubusercontent.com/travisn/rook/openshift-commons-demo/cluster/examples/kubernetes/ceph/storageclass.yaml
+curl -O https://raw.githubusercontent.com/travisn/rook/openshift-commons-demo/workshop/storageclass.yaml
 cat  storageclass.yaml
 ----
 
@@ -218,14 +236,14 @@ oc get storageclass
 oc edit sc glusterfs-storage
 ----
 
-Remove this portion of the storageclass from storageclass 'glusterfs-storage'. Make sure to note EXACTLY where this annotations is located in the storageclass (copying this portion and before and after syntax to clipboard would be good idea).
+Remove this portion of the storageclass from storageclass 'glusterfs-storage'. Make sure to note EXACTLY where this annotations is located in the storageclass (copying this portion and before and after syntax to clipboard would be good idea). The editing tool is 'vi' when using 'oc edit'.
 
 ----
  annotations:
      storageclass.kubernetes.io/is-default-class: "true"
 ----
 
-Add the removed portion to 'rook-ceph-block' in same place so it will be the default storageclass. Validate that 'rook-ceph-block' is now the default storageclass before starting the OCP application deployment.
+Add the removed portion to 'rook-ceph-block' in same place so it will be the default storageclass. Make sure to save your changes before exiting (:wq!). Validate that 'rook-ceph-block' is now the default storageclass before starting the OCP application deployment.
 
 ----
 oc get storageclass
@@ -416,9 +434,9 @@ oc edit cephcluster rook-ceph
 
 Scroll to the bottom of the file and using 'vi' again add the storage device 'xvde' for each of the 3 OCP nodes.
 Please make sure there is a dash in front of the name of the new xvde device, for example:
-```
+----
    - name: xvde
-```
+----
 
 ----
 oc edit cephcluster rook-ceph
