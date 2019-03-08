@@ -6,31 +6,27 @@ This hands-on workshop is for both system administrators and application develop
 
 === In this lab you will learn how to
 
-* Configure and deploy contanerized Ceph using Rook’s CustomResourceDefinitions (CRDs)
-* Validate the resulting deployment of Ceph Luminous using OpenShift CLI
+* Configure and deploy contanerized Ceph using Rook’s cluster CustomResourceDefinitions (CRD)
+* Validate deployment of Ceph Luminous containerized using OpenShift CLI
 * Deploy the Rook toolbox to run common ceph and rados commands
-* Create a Persistent Volume (PV) on the Ceph cluster using a Rook OCP storageclass and Kubernetes FlexVolume driver for Rails applications using a PostgreSQL database.
-* Upgrade Ceph from Luminous to Mimic using the Rook operator
-* Add storage more storage to the Ceph cluster
+* Create a Persistent Volume (PV) on the Ceph cluster using a Rook OCP storageclass for deployment of Rails application using a PostgreSQL database.
+* Upgrade Ceph version from Luminous to Mimic using the Rook operator
+* Add more storage to the Ceph cluster
 
 == Lab Environment
-
-**To login to your OpenShift lab environment go to this link:**
-
-https://redhat.qwiklabs.com/focuses/254
 
 **Lab Guide:** 
 
 https://github.com/travisn/rook/blob/openshift-commons-demo/workshop/readme.adoc
 
 [NOTE]
-*Your facilitator will provide you with your username and password to login.*
+*Your facilitator will provide you with the information to login into your lab environment. Enter the provided username and password into Qwiklabs*
 
 image::qwiklab_login.jpg[]
 
 
 [NOTE]
-*After you 'Start Lab' and then 'End Lab' is completed you will see login information for your OCP master node. Disregard Lab Guide link presented to you above SSHUserName and use Lab Guide above instead.*
+*After you `Start Lab` and then `End Lab` is completed you will see login information for your OCP master node. Disregard Lab Guide link presented to you above SSHUserName and use Lab Guide link above instead.*
 
 image::lab_start.jpg[]
 
@@ -96,9 +92,9 @@ oc get nodes -l node-role.kubernetes.io/compute=true
 
 === Download Rook deployment files and install Ceph
 
-In this section necessary files will be downloaded and then resources created using the 'oc create' command and the CRDs.
+In this section necessary files will be downloaded using the `curl -O` command and OCP resources created using the `oc create` command and the Rook.io yaml files.
 
-Labeling the new OCP nodes with role=storage-node will make sure that the rook resources (OSD, MON, MGR pods) are scheduled on these nodes.
+Labeling the new OCP nodes with role=storage-node will make sure that the OCP resources (OSD, MON, MGR pods) are scheduled on these nodes.
 
 ----
 oc label node node04.internal.aws.testdrive.openshift.com role=storage-node
@@ -107,16 +103,21 @@ oc label node node06.internal.aws.testdrive.openshift.com role=storage-node
 oc get nodes --show-labels | grep storage-node
 ----
 
-Download CRDs scc.yaml, operator.yaml and cluster.yaml and create rook resources. After downloading each CRD view the files using the 'cat' command before creating the resources.
+Next you will download Rook.io scc.yaml, operator.yaml and cluster.yaml to create OCP resources. After downloading each on view the file using the `cat` command before creating the resources using `oc create`.
 
 ----
 curl -O https://raw.githubusercontent.com/travisn/rook/openshift-commons-demo/workshop/scc.yaml
 oc create -f scc.yaml
+----
+
+Validate that rook-ceph has been added to securitycontextconstraints.security.openshift.io.
+
+----
 oc get scc
 oc export scc
 ----
 
-Validate that rook-ceph has been added to securitycontextconstraints.security.openshift.io.
+Install the Rook operator next.
 
 ----
 curl -O https://raw.githubusercontent.com/travisn/rook/openshift-commons-demo/workshop/operator.yaml
@@ -125,13 +126,13 @@ oc project rook-ceph-system
 watch oc get pods -o wide
 ----
 
-Wait for all rook-ceph-agent, rook-discover and rook-ceph-operator pods to be in a Running state. The log for the rook-ceph-operator pod should show that the operator is looking for a cluster. Look for "the server could not find the requested resource (get clusters.ceph.rook.io)". Replace xxxxxxxxx-xxxxx below with your unique values.
+Wait for all rook-ceph-agent, rook-discover and rook-ceph-operator pods to be in a Running state. The log for the rook-ceph-operator pod should show that the operator is looking for a cluster. Look for `the server could not find the requested resource (get clusters.ceph.rook.io)` at the end of the log file. Replace `xxxxxxxxx-xxxxx` below with your rook-ceph-operator pod name.
 
 ----
 oc logs rook-ceph-operator-xxxxxxxxx-xxxxx
 ----
 
-Next step is to download the cluster.yaml to create Ceph MON, MGR and OSD pods.
+Next step is to download and install the cluster CRD to create Ceph MON, MGR and OSD pods.
 
 ----
 oc new-project rook-ceph
@@ -143,6 +144,19 @@ Take a look at the cluster.yaml file. It specifies the version of Ceph, the labe
 
 ----
 cat cluster.yaml
+...omitted...
+  placement:
+    all:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+          - matchExpressions:
+            - key: role
+              operator: In
+              values:
+              - storage-node
+...omitted...
+    image: ceph/ceph:v12.2.11-20190201			  
 ...omitted...
   storage: # cluster level storage configuration and selection
     useAllNodes: false
@@ -166,7 +180,7 @@ Now create the MONs, MGR and OSD pods.
 oc create -f cluster.yaml
 ----
 
-Disregard “Error from server (AlreadyExists): error when creating "cluster.yaml": namespaces "rook-ceph" already exists”
+Disregard this message “Error from server (AlreadyExists): error when creating "cluster.yaml": namespaces "rook-ceph" already exists”
 
 ----
 watch oc get pods
@@ -193,29 +207,30 @@ Login to toolbox pod to run Ceph commands.
 kubectl -n rook-ceph exec -it $(kubectl -n rook-ceph get pod -l "app=rook-ceph-tools" -o jsonpath='{.items[0].metadata.name}') bash
 ceph status
 ceph osd status
+ceph osd tree
 ceph df
 rados df
 exit
 ----
 
-Disregard the ‘health: HEALTH_WARN mons a,b,c are low on available space’ message when viewing results of 'ceph status' command.
+Disregard the ‘health: HEALTH_WARN mons a,b,c are low on available space’ message when viewing results of `ceph status` command.
 
-=== Create Rook storageclass for creating CephRBD volumes
+=== Create Rook storageclass for creating CephRBD block volumes
 
-In this section you will download storageclass.yaml and then create the OCP storageclass 'rook-ceph-block' that will be used by applications to claim persistent storage. The Ceph pool 'replicapool' is created when the storageclass is created and Ceph commands can validate that pool is created.
+In this section you will download storageclass.yaml and then create the OCP storageclass `rook-ceph-block` that will be used by applications to dynamically claim persistent storage (PVCs). The Ceph pool `replicapool` is created when the storageclass is created.
 
 ----
 curl -O https://raw.githubusercontent.com/travisn/rook/openshift-commons-demo/workshop/storageclass.yaml
 cat  storageclass.yaml
 ----
 
-Notice the provisioner: ceph.rook.io/block and that replicated: size=2 as well as fstype: xfs.
+Notice the provisioner: ceph.rook.io/block and that replicated: size=2.
 
 ----
 oc create -f storageclass.yaml
 ----
 
-Login to toolbox pod to run Ceph commands. Compare results for 'ceph df' and 'rados df' executed in prior section before the storageclass was created.
+Login to toolbox pod to run Ceph commands. Compare results for `ceph df` and `rados df` executed in prior section before the storageclass was created.
 
 ----
 kubectl -n rook-ceph exec -it $(kubectl -n rook-ceph get pod -l "app=rook-ceph-tools" -o jsonpath='{.items[0].metadata.name}') bash
@@ -225,31 +240,50 @@ rados -p replicapool ls
 exit
 ----
 
-== Create new OCP deployment with CephRBD block volume
+== Create new OCP deployment using CephRBD block volume
 
-In this section the rook-ceph-block storageclass will be used by an application + database deployment to create persistent storage. The persistent storage will be a CephRBD volume (object) in the pool=replicapool.
+In this section the `rook-ceph-block` storageclass will be used by an application + database deployment to create persistent storage. The persistent storage will be a CephRBD volume (object) in the pool=replicapool.
 
-Because the Rails + PostgreSQL deployment uses the 'default' storageclass we need to modify the current default storageclass (glusterfs-storage) and edit then make 'rook-ceph-block' the default storageclass.
+Because the Rails + PostgreSQL deployment uses the `default` storageclass we need to modify the current default storageclass (glusterfs-storage) and edit then make `rook-ceph-block` the default storageclass.
 
 ----
 oc get storageclass
 oc edit sc glusterfs-storage
 ----
 
-Remove this portion of the storageclass from storageclass 'glusterfs-storage'. Make sure to note EXACTLY where this annotations is located in the storageclass (copying this portion and before and after syntax to clipboard would be good idea). The editing tool is 'vi' when using 'oc edit'.
+Remove this portion shown below from storageclass `glusterfs-storage`. Make sure to note EXACTLY where this annotations is located in the storageclass (copying this portion and before and after syntax to clipboard would be good idea). The editing tool is `vi` when using `oc edit`.
 
 ----
- annotations:
-     storageclass.kubernetes.io/is-default-class: "true"
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "true"
 ----
 
-Add the removed portion to 'rook-ceph-block' in same place so it will be the default storageclass. Make sure to save your changes before exiting (:wq!). Validate that 'rook-ceph-block' is now the default storageclass before starting the OCP application deployment.
+Add the removed portion to `rook-ceph-block` in same place so it will be the default storageclass. Make sure to save your changes before exiting `:wq!`. Validate that `rook-ceph-block` is now the default storageclass before starting the OCP application deployment.
 
 ----
-oc get storageclass
 oc edit sc rook-ceph-block
 oc get storageclass
 ----
+
+After editing storageclass `rook-ceph-block` the result should be similar to below and `rook-ceph-block` should be the `default` storageclass.
+
+----
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "true"
+  creationTimestamp: 2019-03-08T20:54:46Z
+  name: rook-ceph-block
+...omitted...  
+----
+
+----
+$ oc get sc
+NAME                        PROVISIONER               AGE
+glusterfs-storage           kubernetes.io/glusterfs   5h
+rook-ceph-block (default)   ceph.rook.io/block        35m
+----  
 
 Now you are ready to start the Rails + PostgreSQL deployment.
 
@@ -257,10 +291,11 @@ Now you are ready to start the Rails + PostgreSQL deployment.
 oc new-project my-database-app
 oc new-app rails-pgsql-persistent -p VOLUME_CAPACITY=5Gi
 oc status
+oc get pvc
 watch oc get pods
 ----
 
-Wait until the pods are all in a Running state.
+Wait until the pods are all in a Running state. This could take 5 minutes.
 
 ----
 NAME                                 READY     STATUS      RESTARTS   AGE
@@ -277,11 +312,11 @@ NAME                     HOST/PORT                                              
 rails-pgsql-persistent   rails-pgsql-persistent-my-database-app.apps.xxxxxxxxxxx.aws.testdrive.openshift.com
 ----
 
-Resuts of this command will be similar to above. Replace xxxxxxxxxxx with your unique value.
+Resuts of this command will be similar to above. Replace `xxxxxxxxxxx` with your unique value.
 
-Put ‘rails-pgsql-persistent-my-database-app.apps.xxxxxxxxxxx.aws.testdrive.openshift.com/articles’ in a browser tab to create articles.
+Put ‘rails-pgsql-persistent-my-database-app.apps.`xxxxxxxxxxx`.aws.testdrive.openshift.com/articles’ in a browser tab to create articles.
 
-The username/password to create articles and comments is by default 'openshift'/'secret'. You should be able to successfully create articles and comments. When they are saved they are actually saved in the PostgreSQL database which stores its table spaces on a CephRBD volume provided by OCS.
+The username/password to create articles and comments is by default `openshift`/`secret`. You should be able to successfully create articles and comments. When they are saved they are actually saved in the PostgreSQL database which stores its table spaces on a CephRBD volume provided by OCS.
 
 Lets now take another look at the replicapool created by the OCP storageclass. Log into the toolbox pod again.
 
@@ -309,10 +344,11 @@ oc get pvc
 In this section you will upgrade Ceph from from Luminous to Mimic using the Rook operator. The first thing we need to do is update the cluster CRD with the mimic image name and version.
 
 ----
+oc project rook-ceph
 oc edit cephcluster rook-ceph
 ----
 
-Modify this Ceph version. Using 'oc edit' is the same as using editing tool 'vi'.
+Modify the Ceph version in the cluster CRD. Using `oc edit` is the same as using editing tool `vi`.
 
 ----
 spec:
@@ -320,7 +356,7 @@ spec:
     image: ceph/ceph:v12.2.11-20190201
 ----
 
-To this version. Make sure to save (:wq!) the changes before exiting.
+To this version new below. Make sure to save `:wq!` the changes before exiting.
 
 ----
 spec:
@@ -328,7 +364,7 @@ spec:
     image: ceph/ceph:v13.2.4-20190109
 ----
 
-Once the change to the ceph version is saved as shown above, the MONs, MGR, and OSD pods will be restarted
+Once the change to the ceph version is saved as shown above, the MONs, MGR, and OSD pods will be restarted. This could take 5 minutes.
 
 ----
 watch oc get pods
@@ -349,7 +385,7 @@ Now let's check the version of Ceph to see if it is upgraded. First we need to l
 kubectl -n rook-ceph exec -it $(kubectl -n rook-ceph get pod -l "app=rook-ceph-tools" -o jsonpath='{.items[0].metadata.name}') bash
 ----
 
-Running the 'ceph version' command shows it has been upgraded to Mimic. Run other Ceph commands to satisfy yourself (e.g., ceph status) the system is healthy after the upgrade. You might even want to go back to the URL used for the Rails+PostgreSQL application and save a few more articles to make sure applications using Ceph storage are still working.
+Running the `ceph version` command shows it has been upgraded to Mimic. Run other Ceph commands to satisfy yourself (e.g., ceph status) the system is healthy after the upgrade. You might even want to go back to the URL used for the Rails+PostgreSQL application and save a few more articles to make sure applications using Ceph storage are still working.
 
 ----
 ceph version
@@ -364,10 +400,11 @@ In this section you will add more storage to the cluster by increasing the numbe
 Before we make any changes to the cluster CRD let's see what storage is available on our OCP nodes. It is important that the available storage be a raw block device with no formatting or labeling. There should be a storage device availalbe, all of the same size, on the same nodes that were originally used.
 
 ----
-oc get nodes --show-labels | grep storage-node
-node04.internal.aws.testdrive.openshift.com   Ready     compute   2h        v1.11.0+d4cacc0   beta.kubernetes.io/arch=amd64,beta.kubernetes.io/os=linux,kubernetes.io/hostname=node04.internal.aws.testdrive.openshift.com,node-role.kubernetes.io/compute=true,role=storage-node
-node05.internal.aws.testdrive.openshift.com   Ready     compute   2h        v1.11.0+d4cacc0   beta.kubernetes.io/arch=amd64,beta.kubernetes.io/os=linux,kubernetes.io/hostname=node05.internal.aws.testdrive.openshift.com,node-role.kubernetes.io/compute=true,role=storage-node
-node06.internal.aws.testdrive.openshift.com   Ready     compute   2h        v1.11.0+d4cacc0   beta.kubernetes.io/arch=amd64,beta.kubernetes.io/os=linux,kubernetes.io/hostname=node06.internal.aws.testdrive.openshift.com,node-role.kubernetes.io/compute=true,role=storage-node
+oc get nodes -l role=storage-node
+NAME                                          STATUS    ROLES     AGE       VERSION
+node04.internal.aws.testdrive.openshift.com   Ready     compute   1h        v1.11.0+d4cacc0
+node05.internal.aws.testdrive.openshift.com   Ready     compute   1h        v1.11.0+d4cacc0
+node06.internal.aws.testdrive.openshift.com   Ready     compute   1h        v1.11.0+d4cacc0
 ----
 
 To check the storage SSH to one of the OCP nodes that have the role=storage-node.
@@ -376,7 +413,7 @@ To check the storage SSH to one of the OCP nodes that have the role=storage-node
 ssh node04.internal.aws.testdrive.openshift.com
 ----
 
-Check the storage devices on node. You can see that 50GB storage device 'xvdd' is used already by Ceph. Storage device, also 50GB, 'xvde' is not used.
+Check the storage devices on node. You can see that 50GB storage device `xvdd` is used already by Ceph. Storage device `xvde`, also 50GB, is not used yet.
 
 ----
 [cloud-user@node04 ~]$ lsblk
@@ -388,7 +425,7 @@ xvdd                                                                    202:48  
 xvde                                                                    202:64   0  50G  0 disk
 ----
 
-Also /dev/xvde looks to be a raw block device with no labels.
+Also /dev/xvde looks to be a raw block device with no labels, which is required.
 
 ----
 [cloud-user@node04 ~]$ sudo fdisk -l /dev/xvde
@@ -401,76 +438,44 @@ I/O size (minimum/optimal): 512 bytes / 512 bytes
 [cloud-user@node04 ~]$ exit
 ----
 
-After validating the available storage for increasing the number of OSDs we are ready to modify the cluster CRD and this additional storage device, 'xvde'.
+After validating the available storage for increasing the number of OSDs we are ready to modify the cluster CRD and add an additional storage device, `xvde`. 
+
+To make this easier we have created a new cluster CRD yaml file that has the new storage device already added correctly instead of editing the cluster CRD using `oc edit`.
 
 ----
-oc edit cephcluster rook-ceph
+curl -O https://raw.githubusercontent.com/travisn/rook/openshift-commons-demo/workshop/cluster_with_xvde.yaml
+----
+
+Take a look at the new cluster CRD yaml file.
+
+----
+cat cluster_with_xvde.yaml
 ...omitted...
   storage:
-    config: null
+    useAllNodes: false
+    useAllDevices: false
     nodes:
-    - config: null
+    - name: "node04.internal.aws.testdrive.openshift.com"
       devices:
-      - FullPath: ""
-        config: null
-        name: xvdd
-      name: node04.internal.aws.testdrive.openshift.com
-      resources: {}
-    - config: null
+      - name: "xvdd"
+      - name: "xvde"
+    - name: "node05.internal.aws.testdrive.openshift.com"
       devices:
-      - FullPath: ""
-        config: null
-        name: xvdd
-      name: node05.internal.aws.testdrive.openshift.com
-      resources: {}
-    - config: null
+      - name: "xvdd"
+      - name: "xvde"
+    - name: "node06.internal.aws.testdrive.openshift.com"
       devices:
-      - FullPath: ""
-        config: null
-        name: xvdd
-      name: node06.internal.aws.testdrive.openshift.com
-...omitted...
+      - name: "xvdd"
+      - name: "xvde"
 ----
 
-Scroll to the bottom of the file and using 'vi' again add the storage device 'xvde' for each of the 3 OCP nodes.
-Please make sure there is a dash in front of the name of the new xvde device, for example:
-----
-   - name: xvde
+Now add the additional storage device `xvde` to each node above.
+
+----	  
+oc apply -f cluster_with_xvde.yaml
 ----
 
-----
-oc edit cephcluster rook-ceph
-...omitted...
-  storage:
-    config: null
-    nodes:
-    - config: null
-      devices:
-      - FullPath: ""
-        config: null
-        name: xvdd
-      - name: xvde
-      name: node04.internal.aws.testdrive.openshift.com
-      resources: {}
-    - config: null
-      devices:
-      - FullPath: ""
-        config: null
-        name: xvdd
-      - name: xvde
-      name: node05.internal.aws.testdrive.openshift.com
-      resources: {}
-    - config: null
-      devices:
-      - FullPath: ""
-        config: null
-        name: xvdd
-      - name: xvde
-      name: node06.internal.aws.testdrive.openshift.com
-...omitted...
-----
-
-Once you have saved the changes (:wq!) the new OSD pods should be created.
+Once this new defiition is applied the 3 additonal rook-ceph-osd pods will start. Wait until they are in a Running state before proceeding.
 
 ----
 watch oc get pods
