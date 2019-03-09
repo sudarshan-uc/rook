@@ -15,7 +15,7 @@ This hands-on workshop is for both system administrators and application develop
 
 == Lab Environment
 
-**Lab Guide:** 
+**Lab Guide:**
 
 https://github.com/travisn/rook/blob/openshift-commons-demo/workshop/readme.adoc
 
@@ -64,6 +64,10 @@ Test hosts can be reached using ansible.
 
 ----
 ansible new_nodes -m ping
+----
+
+The output of the ping:
+----
 node05.internal.aws.testdrive.openshift.com | SUCCESS => {
     "changed": false,
     "ping": "pong"
@@ -113,8 +117,8 @@ oc create -f scc.yaml
 Validate that rook-ceph has been added to securitycontextconstraints.security.openshift.io.
 
 ----
-oc get scc
-oc export scc
+oc get scc rook-ceph
+oc export scc rook-ceph
 ----
 
 Install the Rook operator next.
@@ -129,6 +133,7 @@ watch oc get pods -o wide
 Wait for all rook-ceph-agent, rook-discover and rook-ceph-operator pods to be in a Running state. The log for the rook-ceph-operator pod should show that the operator is looking for a cluster. Look for `the server could not find the requested resource (get clusters.ceph.rook.io)` at the end of the log file. Replace `xxxxxxxxx-xxxxx` below with your rook-ceph-operator pod name.
 
 ----
+oc get pod -l app=rook-ceph-operator
 oc logs rook-ceph-operator-xxxxxxxxx-xxxxx
 ----
 
@@ -156,7 +161,7 @@ cat cluster.yaml
               values:
               - storage-node
 ...omitted...
-    image: ceph/ceph:v12.2.11-20190201			  
+    image: ceph/ceph:v12.2.11-20190201
 ...omitted...
   storage: # cluster level storage configuration and selection
     useAllNodes: false
@@ -183,6 +188,7 @@ oc create -f cluster.yaml
 Disregard this message “Error from server (AlreadyExists): error when creating "cluster.yaml": namespaces "rook-ceph" already exists”
 
 ----
+oc project rook-ceph
 watch oc get pods
 NAME                                        READY     STATUS      RESTARTS   AGE
 rook-ceph-mgr-a-5887d4d48b-pz52j            1/1       Running     0          2m
@@ -275,7 +281,7 @@ metadata:
     storageclass.kubernetes.io/is-default-class: "true"
   creationTimestamp: 2019-03-08T20:54:46Z
   name: rook-ceph-block
-...omitted...  
+...omitted...
 ----
 
 ----
@@ -283,7 +289,7 @@ $ oc get sc
 NAME                        PROVISIONER               AGE
 glusterfs-storage           kubernetes.io/glusterfs   5h
 rook-ceph-block (default)   ceph.rook.io/block        35m
-----  
+----
 
 Now you are ready to start the Rails + PostgreSQL deployment.
 
@@ -312,11 +318,18 @@ NAME                     HOST/PORT                                              
 rails-pgsql-persistent   rails-pgsql-persistent-my-database-app.apps.xxxxxxxxxxx.aws.testdrive.openshift.com
 ----
 
-Resuts of this command will be similar to above. Replace `xxxxxxxxxxx` with your unique value.
+Results of this command will be similar to above. Replace `xxxxxxxxxxx` with your unique value and copy the URL to your browser to create articles.
 
-Put ‘rails-pgsql-persistent-my-database-app.apps.`xxxxxxxxxxx`.aws.testdrive.openshift.com/articles’ in a browser tab to create articles.
+----
+http://rails-pgsql-persistent-my-database-app.apps.xxxxxxxxxxx.aws.testdrive.openshift.com/articles
+----
 
-The username/password to create articles and comments is by default `openshift`/`secret`. You should be able to successfully create articles and comments. When they are saved they are actually saved in the PostgreSQL database which stores its table spaces on a CephRBD volume provided by OCS.
+Enter the username/password to create articles and comments. The articles and comments are saved in a PostgreSQL database which stores its table spaces on a CephRBD volume provided by OCS.
+
+----
+username: openshift
+password: secret
+----
 
 Lets now take another look at the replicapool created by the OCP storageclass. Log into the toolbox pod again.
 
@@ -385,11 +398,26 @@ Now let's check the version of Ceph to see if it is upgraded. First we need to l
 kubectl -n rook-ceph exec -it $(kubectl -n rook-ceph get pod -l "app=rook-ceph-tools" -o jsonpath='{.items[0].metadata.name}') bash
 ----
 
-Running the `ceph version` command shows it has been upgraded to Mimic. Run other Ceph commands to satisfy yourself (e.g., ceph status) the system is healthy after the upgrade. You might even want to go back to the URL used for the Rails+PostgreSQL application and save a few more articles to make sure applications using Ceph storage are still working.
+Running the `ceph versions` command shows each of the Ceph daemons have been upgraded to Mimic. Run other Ceph commands to satisfy yourself (e.g., ceph status) the system is healthy after the upgrade. You might even want to go back to the URL used for the Rails+PostgreSQL application and save a few more articles to make sure applications using Ceph storage are still working.
 
 ----
-ceph version
-ceph version 13.2.4 (b10be4d44915a4d78a8e06aa31919e74927b142e) mimic (stable)
+ceph versions
+{
+    "mon": {
+        "ceph version 13.2.4 (b10be4d44915a4d78a8e06aa31919e74927b142e) mimic (stable)": 3
+    },
+    "mgr": {
+        "ceph version 13.2.4 (b10be4d44915a4d78a8e06aa31919e74927b142e) mimic (stable)": 1
+    },
+    "osd": {
+        "ceph version 13.2.4 (b10be4d44915a4d78a8e06aa31919e74927b142e) mimic (stable)": 3
+    },
+    "mds": {},
+    "overall": {
+        "ceph version 13.2.4 (b10be4d44915a4d78a8e06aa31919e74927b142e) mimic (stable)": 7
+    }
+}
+
 exit
 ----
 
@@ -438,7 +466,7 @@ I/O size (minimum/optimal): 512 bytes / 512 bytes
 [cloud-user@node04 ~]$ exit
 ----
 
-After validating the available storage for increasing the number of OSDs we are ready to modify the cluster CRD and add an additional storage device, `xvde`. 
+After validating the available storage for increasing the number of OSDs we are ready to modify the cluster CRD and add an additional storage device, `xvde`.
 
 To make this easier we have created a new cluster CRD yaml file that has the new storage device already added correctly instead of editing the cluster CRD using `oc edit`.
 
@@ -471,7 +499,7 @@ cat cluster_with_xvde.yaml
 
 Now add the additional storage device `xvde` to each node above.
 
-----	  
+----
 oc apply -f cluster_with_xvde.yaml
 ----
 
@@ -492,7 +520,7 @@ rook-ceph-osd-4-85f44cc959-9tdhr           1/1       Running     0          1m
 rook-ceph-osd-5-7444994795-ptnqz           1/1       Running     0          1m
 ----
 
-Let's now validate that Ceph is health and has the additional storage. We again login to the toolbox.
+Let's now validate that Ceph is healthy and has the additional storage. We again login to the toolbox.
 
 ----
 kubectl -n rook-ceph exec -it $(kubectl -n rook-ceph get pod -l "app=rook-ceph-tools" -o jsonpath='{.items[0].metadata.name}') bash
