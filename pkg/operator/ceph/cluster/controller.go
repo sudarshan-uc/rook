@@ -176,7 +176,7 @@ func (c *ClusterController) onK8sNodeAdd(obj interface{}) {
 		}
 
 		if valid, _ := k8sutil.ValidNode(*newNode, cluster.Spec.Placement.All()); valid == true {
-			logger.Debugf("Adding %s to cluster %s", newNode.Labels[apis.LabelHostname], cluster.Namespace)
+			logger.Infof("Adding node %s to cluster %s", newNode.Labels[apis.LabelHostname], cluster.Namespace)
 			err := cluster.createInstance(c.rookImage, cluster.Info.CephVersion)
 			if err != nil {
 				logger.Errorf("Failed to update cluster in namespace %s. Was not able to add %s. %+v", cluster.Namespace, newNode.Labels[apis.LabelHostname], err)
@@ -185,7 +185,7 @@ func (c *ClusterController) onK8sNodeAdd(obj interface{}) {
 			logger.Infof("Could not add host %s . It is not valid", newNode.Labels[apis.LabelHostname])
 			continue
 		}
-		logger.Infof("Added %s to cluster %s", newNode.Labels[apis.LabelHostname], cluster.Namespace)
+		logger.Infof("Added node %s to cluster %s", newNode.Labels[apis.LabelHostname], cluster.Namespace)
 	}
 }
 

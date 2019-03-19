@@ -66,13 +66,14 @@ func newCluster(c *cephv1.CephCluster, context *clusterd.Context) *cluster {
 		// at this phase of the cluster creation process, the identity components of the cluster are
 		// not yet established. we reserve this struct which is filled in as soon as the cluster's
 		// identity can be established.
-		Info:      nil,
-		Namespace: c.Namespace,
-		Spec:      &c.Spec,
-		context:   context,
-		stopCh:    make(chan struct{}),
-		ownerRef:  ownerRef,
-		mons:      mon.New(context, c.Namespace, c.Spec.DataDirHostPath, c.Spec.Network.HostNetwork, ownerRef),
+		Info:                 nil,
+		Namespace:            c.Namespace,
+		Spec:                 &c.Spec,
+		context:              context,
+		orchestrationPending: true,
+		stopCh:               make(chan struct{}),
+		ownerRef:             ownerRef,
+		mons:                 mon.New(context, c.Namespace, c.Spec.DataDirHostPath, c.Spec.Network.HostNetwork, ownerRef),
 	}
 }
 
@@ -145,9 +146,7 @@ func (c *cluster) createInstance(rookImage string, cephVersion cephver.CephVersi
 	}
 
 	defer c.unsetOrchestrationRunning()
-	initRun := true
-	for c.checkUnsetOrchestrationPending() == true || initRun == true {
-		initRun = false
+	for c.checkUnsetOrchestrationPending() == true {
 		// Use a DeepCopy of the spec to avoid using an inconsistent data-set
 		spec := c.Spec.DeepCopy()
 
