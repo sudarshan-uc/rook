@@ -64,26 +64,67 @@ type Operator struct {
 	securityAccount string
 	// The custom resource that is global to the kubernetes cluster.
 	// The cluster is global because you create multiple clusters in k8s
-	clusterController *cluster.ClusterController
+	clusterController    *cluster.ClusterController
+	systemDaemonsStarted bool
 }
 
 // New creates an operator instance
 func New(context *clusterd.Context, volumeAttachmentWrapper attachment.Attachment, rookImage, securityAccount string) *Operator {
-	clusterController := cluster.NewClusterController(context, rookImage, volumeAttachmentWrapper)
-
 	schemes := []opkit.CustomResource{cluster.ClusterResource, pool.PoolResource, object.ObjectStoreResource, objectuser.ObjectStoreUserResource,
 		file.FilesystemResource, attachment.VolumeResource}
-	return &Operator{
-		context:           context,
-		clusterController: clusterController,
-		resources:         schemes,
-		rookImage:         rookImage,
-		securityAccount:   securityAccount,
+	o := &Operator{
+		context:         context,
+		resources:       schemes,
+		rookImage:       rookImage,
+		securityAccount: securityAccount,
 	}
+	o.clusterController = cluster.NewClusterController(context, rookImage, volumeAttachmentWrapper, o.startSystemDaemons)
+	return o
 }
 
 // Run the operator instance
 func (o *Operator) Run() error {
+
+	signalChan := make(chan os.Signal, 1)
+	stopChan := make(chan struct{})
+	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)
+
+	serverVersion, err := o.context.Clientset.Discovery().ServerVersion()
+	if err != nil {
+		return fmt.Errorf("Error getting server version: %v", err)
+	}
+
+	// Run volume provisioner for each of the supported configurations
+	for name, vendor := range provisionerConfigs {
+		volumeProvisioner := provisioner.New(o.context, vendor)
+		pc := controller.NewProvisionController(
+			o.context.Clientset,
+			name,
+			volumeProvisioner,
+			serverVersion.GitVersion,
+		)
+		go pc.Run(stopChan)
+		logger.Infof("rook-provisioner %s started using %s flex vendor dir", name, vendor)
+	}
+
+	// watch for changes to the rook clusters
+	o.clusterController.StartWatch(v1.NamespaceAll, stopChan)
+
+	for {
+		select {
+		case <-signalChan:
+			logger.Infof("shutdown signal received, exiting...")
+			close(stopChan)
+			o.clusterController.StopWatch()
+			return nil
+		}
+	}
+}
+
+func (o *Operator) startSystemDaemons() error {
+	if o.systemDaemonsStarted {
+		return nil
+	}
 
 	namespace := os.Getenv(k8sutil.PodNamespaceEnvVar)
 	if namespace == "" {
@@ -126,33 +167,6 @@ func (o *Operator) Run() error {
 		}
 	}
 
-	signalChan := make(chan os.Signal, 1)
-	stopChan := make(chan struct{})
-	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)
-
-	// Run volume provisioner for each of the supported configurations
-	for name, vendor := range provisionerConfigs {
-		volumeProvisioner := provisioner.New(o.context, vendor)
-		pc := controller.NewProvisionController(
-			o.context.Clientset,
-			name,
-			volumeProvisioner,
-			serverVersion.GitVersion,
-		)
-		go pc.Run(stopChan)
-		logger.Infof("rook-provisioner %s started using %s flex vendor dir", name, vendor)
-	}
-
-	// watch for changes to the rook clusters
-	o.clusterController.StartWatch(v1.NamespaceAll, stopChan)
-
-	for {
-		select {
-		case <-signalChan:
-			logger.Infof("shutdown signal received, exiting...")
-			close(stopChan)
-			o.clusterController.StopWatch()
-			return nil
-		}
-	}
+	o.systemDaemonsStarted = true
+	return nil
 }
