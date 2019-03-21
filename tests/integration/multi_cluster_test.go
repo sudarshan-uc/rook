@@ -19,7 +19,6 @@ package integration
 import (
 	"fmt"
 	"testing"
-	"time"
 
 	"github.com/rook/rook/tests/framework/clients"
 	"github.com/rook/rook/tests/framework/installer"
@@ -149,14 +148,6 @@ func (o MCTestOperations) Setup() {
 	require.True(o.T(), o.kh.IsPodInExpectedState("rook-ceph-operator", o.systemNamespace, "Running"),
 		"Make sure rook-operator is in running state")
 
-	require.True(o.T(), o.kh.IsPodInExpectedState("rook-ceph-agent", o.systemNamespace, "Running"),
-		"Make sure rook-ceph-agent is in running state")
-
-	require.True(o.T(), o.kh.IsPodInExpectedState("rook-discover", o.systemNamespace, "Running"),
-		"Make sure rook-discover is in running state")
-
-	time.Sleep(10 * time.Second)
-
 	// start the two clusters in parallel
 	logger.Infof("starting two clusters in parallel")
 	errCh1 := make(chan error, 1)
@@ -165,8 +156,13 @@ func (o MCTestOperations) Setup() {
 	go o.startCluster(o.namespace2, "filestore", errCh2)
 	require.NoError(o.T(), <-errCh1)
 	require.NoError(o.T(), <-errCh2)
-	logger.Infof("finished starting clusters")
 
+	require.True(o.T(), o.kh.IsPodInExpectedState("rook-ceph-agent", o.systemNamespace, "Running"),
+		"Make sure rook-ceph-agent is in running state")
+	require.True(o.T(), o.kh.IsPodInExpectedState("rook-discover", o.systemNamespace, "Running"),
+		"Make sure rook-discover is in running state")
+
+	logger.Infof("finished starting clusters")
 }
 
 // TearDownRook is a wrapper for tearDown after suite

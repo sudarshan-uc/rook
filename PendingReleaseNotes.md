@@ -20,6 +20,7 @@
 - Added Ceph CSI driver deployments on Kubernetes 1.13 and above.
 - The number of mons can be increased automatically when new nodes come online. See the [preferredCount](https://rook.io/docs/rook/master/ceph-cluster-crd.html#mon-settings) setting in the cluster CRD documentation.
 - New Kubernetes nodes or nodes which are not tainted `NoSchedule` anymore get added automatically to the existing rook cluster if `useAllNodes` is set. [Issue #2208](https://github.com/rook/rook/issues/2208)
+- The Rook Agent and Discover DaemonSets are now started when the CephCluster is created rather than immediately when the operator is started.
 
 ## Breaking Changes
 
