@@ -51,6 +51,7 @@ type cluster struct {
 	context              *clusterd.Context
 	Namespace            string
 	Spec                 *cephv1.ClusterSpec
+	crdName              string
 	mons                 *mon.Cluster
 	stopCh               chan struct{}
 	ownerRef             metav1.OwnerReference
@@ -70,6 +71,7 @@ func newCluster(c *cephv1.CephCluster, context *clusterd.Context) *cluster {
 		Namespace: c.Namespace,
 		Spec:      &c.Spec,
 		context:   context,
+		crdName:   c.Name,
 		stopCh:    make(chan struct{}),
 		ownerRef:  ownerRef,
 		mons:      mon.New(context, c.Namespace, c.Spec.DataDirHostPath, c.Spec.Network.HostNetwork, ownerRef),

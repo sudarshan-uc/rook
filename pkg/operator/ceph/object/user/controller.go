@@ -51,15 +51,17 @@ var ObjectStoreUserResource = opkit.CustomResource{
 
 // ObjectStoreUserController represents a controller object for object store user custom resources
 type ObjectStoreUserController struct {
-	context  *clusterd.Context
-	ownerRef metav1.OwnerReference
+	context     *clusterd.Context
+	ownerRef    metav1.OwnerReference
+	clusterSpec *cephv1.ClusterSpec
 }
 
 // NewObjectStoreUserController create controller for watching object store user custom resources created
-func NewObjectStoreUserController(context *clusterd.Context, ownerRef metav1.OwnerReference) *ObjectStoreUserController {
+func NewObjectStoreUserController(context *clusterd.Context, clusterSpec *cephv1.ClusterSpec, ownerRef metav1.OwnerReference) *ObjectStoreUserController {
 	return &ObjectStoreUserController{
-		context:  context,
-		ownerRef: ownerRef,
+		context:     context,
+		ownerRef:    ownerRef,
+		clusterSpec: clusterSpec,
 	}
 }
 
@@ -80,6 +82,11 @@ func (c *ObjectStoreUserController) StartWatch(namespace string, stopCh chan str
 }
 
 func (c *ObjectStoreUserController) onAdd(obj interface{}) {
+	if c.clusterSpec.ExternalCeph {
+		logger.Warningf("Creating object store users for an external ceph cluster is not supported")
+		return
+	}
+
 	user, err := getObjectStoreUserObject(obj)
 	if err != nil {
 		logger.Errorf("failed to get objectstoreuser object: %+v", err)
@@ -92,10 +99,20 @@ func (c *ObjectStoreUserController) onAdd(obj interface{}) {
 }
 
 func (c *ObjectStoreUserController) onUpdate(oldObj, newObj interface{}) {
+	if c.clusterSpec.ExternalCeph {
+		logger.Warningf("Updating object store users for an external ceph cluster is not supported")
+		return
+	}
+
 	// TODO: Add update code here after features are added which require updates.
 }
 
 func (c *ObjectStoreUserController) onDelete(obj interface{}) {
+	if c.clusterSpec.ExternalCeph {
+		logger.Warningf("Deleting object store users for an external ceph cluster is not supported")
+		return
+	}
+
 	user, err := getObjectStoreUserObject(obj)
 	if err != nil {
 		logger.Errorf("failed to get objectstoreuser object: %+v", err)

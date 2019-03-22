@@ -159,7 +159,7 @@ func (c *CephNFSController) runGaneshaRadosGraceJob(n cephv1.CephNFS, name, acti
 							Command:      []string{ganeshaRadosGraceCmd},
 							Args:         args,
 							Name:         ganeshaRadosGraceCmd,
-							Image:        c.cephVersion.Image,
+							Image:        c.clusterSpec.CephVersion.Image,
 							VolumeMounts: opspec.RookVolumeMounts(),
 						},
 					},

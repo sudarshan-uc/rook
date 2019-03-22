@@ -121,7 +121,7 @@ func (o *Operator) Run() error {
 	}
 }
 
-func (o *Operator) startSystemDaemons() error {
+func (o *Operator) startSystemDaemons(externalCeph bool) error {
 	if o.systemDaemonsStarted {
 		return nil
 	}
@@ -137,9 +137,13 @@ func (o *Operator) startSystemDaemons() error {
 		return fmt.Errorf("Error starting agent daemonset: %v", err)
 	}
 
-	rookDiscover := discover.New(o.context.Clientset)
-	if err := rookDiscover.Start(namespace, o.rookImage, o.securityAccount); err != nil {
-		return fmt.Errorf("Error starting device discovery daemonset: %v", err)
+	// The discover daemon is only needed for local clusters where OSDs will be created.
+	// External clusters do not create OSDs locally.
+	if !externalCeph {
+		rookDiscover := discover.New(o.context.Clientset)
+		if err := rookDiscover.Start(namespace, o.rookImage, o.securityAccount); err != nil {
+			return fmt.Errorf("Error starting device discovery daemonset: %v", err)
+		}
 	}
 
 	serverVersion, err := o.context.Clientset.Discovery().ServerVersion()

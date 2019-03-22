@@ -63,13 +63,15 @@ var PoolResourceRookLegacy = opkit.CustomResource{
 
 // PoolController represents a controller object for pool custom resources
 type PoolController struct {
-	context *clusterd.Context
+	context     *clusterd.Context
+	clusterSpec *cephv1.ClusterSpec
 }
 
 // NewPoolController create controller for watching pool custom resources created
-func NewPoolController(context *clusterd.Context) *PoolController {
+func NewPoolController(context *clusterd.Context, clusterSpec *cephv1.ClusterSpec) *PoolController {
 	return &PoolController{
-		context: context,
+		context:     context,
+		clusterSpec: clusterSpec,
 	}
 }
 
@@ -93,6 +95,11 @@ func (c *PoolController) StartWatch(namespace string, stopCh chan struct{}) erro
 }
 
 func (c *PoolController) onAdd(obj interface{}) {
+	if c.clusterSpec.ExternalCeph {
+		logger.Warningf("Creating pools for an external ceph cluster is not supported")
+		return
+	}
+
 	pool, migrationNeeded, err := getPoolObject(obj)
 	if err != nil {
 		logger.Errorf("failed to get pool object: %+v", err)
@@ -113,6 +120,11 @@ func (c *PoolController) onAdd(obj interface{}) {
 }
 
 func (c *PoolController) onUpdate(oldObj, newObj interface{}) {
+	if c.clusterSpec.ExternalCeph {
+		logger.Warningf("Updating pools for an external ceph cluster is not supported")
+		return
+	}
+
 	oldPool, _, err := getPoolObject(oldObj)
 	if err != nil {
 		logger.Errorf("failed to get old pool object: %+v", err)
@@ -160,6 +172,11 @@ func poolChanged(old, new cephv1.PoolSpec) bool {
 }
 
 func (c *PoolController) onDelete(obj interface{}) {
+	if c.clusterSpec.ExternalCeph {
+		logger.Warningf("Deleting pools for an external ceph cluster is not supported")
+		return
+	}
+
 	pool, migrationNeeded, err := getPoolObject(obj)
 	if err != nil {
 		logger.Errorf("failed to get pool object: %+v", err)

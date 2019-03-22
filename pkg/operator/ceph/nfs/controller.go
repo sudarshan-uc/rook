@@ -47,19 +47,17 @@ type CephNFSController struct {
 	clusterInfo *cephconfig.ClusterInfo
 	context     *clusterd.Context
 	rookImage   string
-	cephVersion cephv1.CephVersionSpec
-	hostNetwork bool
+	clusterSpec *cephv1.ClusterSpec
 	ownerRef    metav1.OwnerReference
 }
 
 // NewNFSCephNFSController create controller for watching NFS custom resources created
-func NewCephNFSController(clusterInfo *cephconfig.ClusterInfo, context *clusterd.Context, rookImage string, cephVersion cephv1.CephVersionSpec, hostNetwork bool, ownerRef metav1.OwnerReference) *CephNFSController {
+func NewCephNFSController(clusterInfo *cephconfig.ClusterInfo, context *clusterd.Context, rookImage string, clusterSpec *cephv1.ClusterSpec, ownerRef metav1.OwnerReference) *CephNFSController {
 	return &CephNFSController{
 		clusterInfo: clusterInfo,
 		context:     context,
 		rookImage:   rookImage,
-		cephVersion: cephVersion,
-		hostNetwork: hostNetwork,
+		clusterSpec: clusterSpec,
 		ownerRef:    ownerRef,
 	}
 }
@@ -81,6 +79,11 @@ func (c *CephNFSController) StartWatch(namespace string, stopCh chan struct{}) e
 }
 
 func (c *CephNFSController) onAdd(obj interface{}) {
+	if c.clusterSpec.ExternalCeph {
+		logger.Warningf("Creating NFS configuration for an external ceph cluster is not supported")
+		return
+	}
+
 	nfs := obj.(*cephv1.CephNFS).DeepCopy()
 	if !c.clusterInfo.CephVersion.IsAtLeastNautilus() {
 		logger.Errorf("Ceph NFS is only supported with Nautilus or newer. CRD %s will be ignored.", nfs.Name)
@@ -94,6 +97,11 @@ func (c *CephNFSController) onAdd(obj interface{}) {
 }
 
 func (c *CephNFSController) onUpdate(oldObj, newObj interface{}) {
+	if c.clusterSpec.ExternalCeph {
+		logger.Warningf("Updating NFS configuration for an external ceph cluster is not supported")
+		return
+	}
+
 	oldNFS := oldObj.(*cephv1.CephNFS).DeepCopy()
 	newNFS := newObj.(*cephv1.CephNFS).DeepCopy()
 	if !c.clusterInfo.CephVersion.IsAtLeastNautilus() {
@@ -122,6 +130,11 @@ func (c *CephNFSController) onUpdate(oldObj, newObj interface{}) {
 }
 
 func (c *CephNFSController) onDelete(obj interface{}) {
+	if c.clusterSpec.ExternalCeph {
+		logger.Warningf("Deleting NFS configuration for an external ceph cluster is not supported")
+		return
+	}
+
 	nfs := obj.(*cephv1.CephNFS).DeepCopy()
 	if !c.clusterInfo.CephVersion.IsAtLeastNautilus() {
 		logger.Errorf("Ceph NFS is only supported with Nautilus or newer. CRD %s cleanup will be ignored.", nfs.Name)

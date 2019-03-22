@@ -87,7 +87,7 @@ func TestMigrateFilesystemObject(t *testing.T) {
 	}
 	clusterInfo := &cephconfig.ClusterInfo{FSID: "myfsid"}
 
-	controller := NewFilesystemController(clusterInfo, context, "", cephv1.CephVersionSpec{}, false, metav1.OwnerReference{})
+	controller := NewFilesystemController(clusterInfo, context, "", &cephv1.ClusterSpec{}, metav1.OwnerReference{})
 
 	// convert the legacy filesystem object in memory and assert that a migration is needed
 	convertedFilesystem, migrationNeeded, err := getFilesystemObject(legacyFilesystem)

@@ -60,8 +60,7 @@ type FilesystemController struct {
 	clusterInfo *cephconfig.ClusterInfo
 	context     *clusterd.Context
 	rookVersion string
-	cephVersion cephv1.CephVersionSpec
-	hostNetwork bool
+	clusterSpec *cephv1.ClusterSpec
 	ownerRef    metav1.OwnerReference
 }
 
@@ -70,16 +69,14 @@ func NewFilesystemController(
 	clusterInfo *cephconfig.ClusterInfo,
 	context *clusterd.Context,
 	rookVersion string,
-	cephVersion cephv1.CephVersionSpec,
-	hostNetwork bool,
+	clusterSpec *cephv1.ClusterSpec,
 	ownerRef metav1.OwnerReference,
 ) *FilesystemController {
 	return &FilesystemController{
 		clusterInfo: clusterInfo,
 		context:     context,
 		rookVersion: rookVersion,
-		cephVersion: cephVersion,
-		hostNetwork: hostNetwork,
+		clusterSpec: clusterSpec,
 		ownerRef:    ownerRef,
 	}
 }
@@ -104,6 +101,11 @@ func (c *FilesystemController) StartWatch(namespace string, stopCh chan struct{}
 }
 
 func (c *FilesystemController) onAdd(obj interface{}) {
+	if c.clusterSpec.ExternalCeph {
+		logger.Warningf("Creating filesystems for an external ceph cluster is not supported")
+		return
+	}
+
 	filesystem, migrationNeeded, err := getFilesystemObject(obj)
 	if err != nil {
 		logger.Errorf("failed to get filesystem object: %+v", err)
@@ -117,13 +119,18 @@ func (c *FilesystemController) onAdd(obj interface{}) {
 		return
 	}
 
-	err = createFilesystem(c.clusterInfo, c.context, *filesystem, c.rookVersion, c.cephVersion, c.hostNetwork, c.filesystemOwners(filesystem))
+	err = createFilesystem(c.clusterInfo, c.context, *filesystem, c.rookVersion, c.clusterSpec, c.filesystemOwners(filesystem))
 	if err != nil {
 		logger.Errorf("failed to create filesystem %s: %+v", filesystem.Name, err)
 	}
 }
 
 func (c *FilesystemController) onUpdate(oldObj, newObj interface{}) {
+	if c.clusterSpec.ExternalCeph {
+		logger.Warningf("Updating filesystems for an external ceph cluster is not supported")
+		return
+	}
+
 	oldFS, _, err := getFilesystemObject(oldObj)
 	if err != nil {
 		logger.Errorf("failed to get old filesystem object: %+v", err)
@@ -149,13 +156,18 @@ func (c *FilesystemController) onUpdate(oldObj, newObj interface{}) {
 
 	// if the filesystem is modified, allow the filesystem to be created if it wasn't already
 	logger.Infof("updating filesystem %s", newFS.Name)
-	err = createFilesystem(c.clusterInfo, c.context, *newFS, c.rookVersion, c.cephVersion, c.hostNetwork, c.filesystemOwners(newFS))
+	err = createFilesystem(c.clusterInfo, c.context, *newFS, c.rookVersion, c.clusterSpec, c.filesystemOwners(newFS))
 	if err != nil {
 		logger.Errorf("failed to create (modify) filesystem %s: %+v", newFS.Name, err)
 	}
 }
 
 func (c *FilesystemController) onDelete(obj interface{}) {
+	if c.clusterSpec.ExternalCeph {
+		logger.Warningf("Deleting filesystems for an external ceph cluster is not supported")
+		return
+	}
+
 	filesystem, migrationNeeded, err := getFilesystemObject(obj)
 	if err != nil {
 		logger.Errorf("failed to get filesystem object: %+v", err)

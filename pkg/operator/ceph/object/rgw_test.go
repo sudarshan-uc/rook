@@ -52,7 +52,7 @@ func TestStartRGW(t *testing.T) {
 	data := cephconfig.NewStatelessDaemonDataPathMap(cephconfig.RgwType, "my-fs")
 
 	// start a basic cluster
-	c := &clusterConfig{info, context, store, version, cephv1.CephVersionSpec{}, false, []metav1.OwnerReference{}, data}
+	c := &clusterConfig{info, context, store, version, &cephv1.ClusterSpec{}, []metav1.OwnerReference{}, data}
 	err := c.createStore()
 	assert.Nil(t, err)
 
@@ -116,7 +116,7 @@ func TestCreateObjectStore(t *testing.T) {
 	data := cephconfig.NewStatelessDaemonDataPathMap(cephconfig.RgwType, "my-fs")
 
 	// create the pools
-	c := &clusterConfig{info, context, store, "1.2.3.4", cephv1.CephVersionSpec{}, false, []metav1.OwnerReference{}, data}
+	c := &clusterConfig{info, context, store, "1.2.3.4", &cephv1.ClusterSpec{}, []metav1.OwnerReference{}, data}
 	err := c.createStore()
 	assert.Nil(t, err)
 }

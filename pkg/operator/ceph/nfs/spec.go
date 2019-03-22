@@ -59,7 +59,7 @@ func (c *CephNFSController) createCephNFSService(n cephv1.CephNFS, name string) 
 		},
 	}
 	k8sutil.SetOwnerRef(c.context.Clientset, n.Namespace, &svc.ObjectMeta, &c.ownerRef)
-	if c.hostNetwork {
+	if c.clusterSpec.Network.HostNetwork {
 		svc.Spec.ClusterIP = v1.ClusterIPNone
 	}
 
@@ -101,9 +101,9 @@ func (c *CephNFSController) makeDeployment(n cephv1.CephNFS, name, configName st
 			configVolume,
 			binariesVolume,
 		),
-		HostNetwork: c.hostNetwork,
+		HostNetwork: c.clusterSpec.Network.HostNetwork,
 	}
-	if c.hostNetwork {
+	if c.clusterSpec.Network.HostNetwork {
 		podSpec.DNSPolicy = v1.DNSClusterFirstWithHostNet
 	}
 	n.Spec.Server.Placement.ApplyToPodSpec(&podSpec)
@@ -169,14 +169,14 @@ func (c *CephNFSController) daemonContainer(n cephv1.CephNFS, name string, binar
 			"run",
 		},
 		Name:  "ceph-nfs",
-		Image: c.cephVersion.Image,
+		Image: c.clusterSpec.CephVersion.Image,
 		VolumeMounts: append(
 			opspec.CephVolumeMounts(),
 			configMount,
 			binariesMount,
 		),
 		Env: append(
-			k8sutil.ClusterDaemonEnvVars(c.cephVersion.Image),
+			k8sutil.ClusterDaemonEnvVars(c.clusterSpec.CephVersion.Image),
 			v1.EnvVar{Name: "ROOK_CEPH_NFS_NAME", Value: name},
 		),
 		Resources: n.Spec.Server.Resources,

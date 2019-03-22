@@ -58,6 +58,7 @@ var ObjectStoreResourceRookLegacy = opkit.CustomResource{
 // ObjectStoreController represents a controller object for object store custom resources
 type ObjectStoreController struct {
 	clusterInfo *daemonconfig.ClusterInfo
+	clusterSpec *cephv1.ClusterSpec
 	context     *clusterd.Context
 	rookImage   string
 	cephVersion cephv1.CephVersionSpec
@@ -70,16 +71,14 @@ func NewObjectStoreController(
 	clusterInfo *daemonconfig.ClusterInfo,
 	context *clusterd.Context,
 	rookImage string,
-	cephVersion cephv1.CephVersionSpec,
-	hostNetwork bool,
+	clusterSpec *cephv1.ClusterSpec,
 	ownerRef metav1.OwnerReference,
 ) *ObjectStoreController {
 	return &ObjectStoreController{
 		clusterInfo: clusterInfo,
 		context:     context,
 		rookImage:   rookImage,
-		cephVersion: cephVersion,
-		hostNetwork: hostNetwork,
+		clusterSpec: clusterSpec,
 		ownerRef:    ownerRef,
 	}
 }
@@ -104,6 +103,11 @@ func (c *ObjectStoreController) StartWatch(namespace string, stopCh chan struct{
 }
 
 func (c *ObjectStoreController) onAdd(obj interface{}) {
+	if c.clusterSpec.ExternalCeph {
+		logger.Warningf("Creating object stores for an external ceph cluster is not supported")
+		return
+	}
+
 	objectstore, migrationNeeded, err := getObjectStoreObject(obj)
 	if err != nil {
 		logger.Errorf("failed to get objectstore object: %+v", err)
@@ -122,8 +126,7 @@ func (c *ObjectStoreController) onAdd(obj interface{}) {
 		context:     c.context,
 		store:       *objectstore,
 		rookVersion: c.rookImage,
-		cephVersion: c.cephVersion,
-		hostNetwork: c.hostNetwork,
+		clusterSpec: c.clusterSpec,
 		ownerRefs:   c.storeOwners(objectstore),
 		DataPathMap: cephconfig.NewStatelessDaemonDataPathMap(cephconfig.RgwType, objectstore.Name),
 	}
@@ -133,6 +136,11 @@ func (c *ObjectStoreController) onAdd(obj interface{}) {
 }
 
 func (c *ObjectStoreController) onUpdate(oldObj, newObj interface{}) {
+	if c.clusterSpec.ExternalCeph {
+		logger.Warningf("Updating object stores for an external ceph cluster is not supported")
+		return
+	}
+
 	// if the object store spec is modified, update the object store
 	oldStore, _, err := getObjectStoreObject(oldObj)
 	if err != nil {
@@ -163,8 +171,7 @@ func (c *ObjectStoreController) onUpdate(oldObj, newObj interface{}) {
 		c.context,
 		*newStore,
 		c.rookImage,
-		c.cephVersion,
-		c.hostNetwork,
+		c.clusterSpec,
 		c.storeOwners(newStore),
 		cephconfig.NewStatelessDaemonDataPathMap(cephconfig.RgwType, newStore.Name),
 	}
@@ -174,6 +181,11 @@ func (c *ObjectStoreController) onUpdate(oldObj, newObj interface{}) {
 }
 
 func (c *ObjectStoreController) onDelete(obj interface{}) {
+	if c.clusterSpec.ExternalCeph {
+		logger.Warningf("Deleting object stores for an external ceph cluster is not supported")
+		return
+	}
+
 	objectstore, migrationNeeded, err := getObjectStoreObject(obj)
 	if err != nil {
 		logger.Errorf("failed to get objectstore object: %+v", err)
