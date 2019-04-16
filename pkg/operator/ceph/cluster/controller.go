@@ -34,6 +34,7 @@ import (
 	"github.com/rook/rook/pkg/operator/ceph/file"
 	"github.com/rook/rook/pkg/operator/ceph/nfs"
 	"github.com/rook/rook/pkg/operator/ceph/object"
+	"github.com/rook/rook/pkg/operator/ceph/object/bucket"
 	objectuser "github.com/rook/rook/pkg/operator/ceph/object/user"
 	"github.com/rook/rook/pkg/operator/ceph/pool"
 	"github.com/rook/rook/pkg/operator/k8sutil"
@@ -292,6 +293,15 @@ func (c *ClusterController) onAdd(obj interface{}) {
 	// Start object store user CRD watcher
 	objectStoreUserController := objectuser.NewObjectStoreUserController(c.context, cluster.ownerRef)
 	objectStoreUserController.StartWatch(cluster.Namespace, cluster.stopCh)
+
+	// Start the object bucket provisioner
+	bucketProvisioner := bucket.NewProvisioner(c.context.Clientset, cluster.Namespace)
+	bucketController, err := bucket.NewBucketController(c.context.Clientset.Settings().RESTClient, bucketProvisioner)
+	if err != nil {
+		logger.Errorf("Bucket provisioner failed to start. %+v", err)
+	} else {
+		go bucketController.Run()
+	}
 
 	// Start file system CRD watcher
 	fileController := file.NewFilesystemController(cluster.Info, c.context, c.rookImage, cluster.Spec.CephVersion, cluster.Spec.Network.HostNetwork, cluster.ownerRef, cluster.Spec.DataDirHostPath)

@@ -35,6 +35,14 @@
   revision = "de5bf2ad457846296e2031421a34e2568e304e35"
 
 [[projects]]
+  digest = "1:464aef731a5f82ded547c62e249a2e9ec59fbbc9ddab53cda7b9857852630a61"
+  name = "github.com/appscode/jsonpatch"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "7c0e3b262f30165a8ec3d0b4c6059fd92703bfb2"
+  version = "1.0.0"
+
+[[projects]]
   digest = "1:8404a965fb2ea6fb9f8b23d738b7abbc4e167483a5289e1bd02520f91651a866"
   name = "github.com/aws/aws-sdk-go"
   packages = [
@@ -217,6 +225,22 @@
   pruneopts = "UT"
   revision = "6ed8d5f64cd79a498d1f3fab5880cc376ce41bbe"
   version = "v1.41.0"
+
+[[projects]]
+  digest = "1:edd2fa4578eb086265db78a9201d15e76b298dfd0d5c379da83e9c61712cf6df"
+  name = "github.com/go-logr/logr"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "9fb12b3b21c5415d16ac18dc5cd42c1cfdd40c4e"
+  version = "v0.1.0"
+
+[[projects]]
+  digest = "1:d81dfed1aa731d8e4a45d87154ec15ef18da2aa80fa9a2f95bec38577a244a99"
+  name = "github.com/go-logr/zapr"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "03f06a783fbb7dfaf3f629c7825480e43a7105e6"
+  version = "v0.1.1"
 
 [[projects]]
   digest = "1:953a2628e4c5c72856b53f5470ed5e071c55eccf943d798d42908102af2a610f"
@@ -653,6 +677,52 @@
 
 [[projects]]
   branch = "master"
+  digest = "1:4a6335fa45d2c59f8b22d522fff4d8474ae45bbe54b3d4c133c76e93f022b275"
+  name = "github.com/yard-turkey/lib-bucket-provisioner"
+  packages = [
+    "pkg/apis",
+    "pkg/apis/objectbucket.io/v1alpha1",
+    "pkg/provisioner",
+    "pkg/provisioner/api",
+    "pkg/provisioner/api/errors",
+    "pkg/provisioner/reconciler/claim-reconciler",
+  ]
+  pruneopts = "UT"
+  revision = "c528078c3a2bd6fdf131bfef18be7eaabdf5a7f8"
+
+[[projects]]
+  digest = "1:3c1a69cdae3501bf75e76d0d86dc6f2b0a7421bc205c0cb7b96b19eed464a34d"
+  name = "go.uber.org/atomic"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "1ea20fb1cbb1cc08cbd0d913a96dead89aa18289"
+  version = "v1.3.2"
+
+[[projects]]
+  digest = "1:60bf2a5e347af463c42ed31a493d817f8a72f102543060ed992754e689805d1a"
+  name = "go.uber.org/multierr"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "3c4937480c32f4c13a875a1829af76c98ca3d40a"
+  version = "v1.1.0"
+
+[[projects]]
+  digest = "1:c52caf7bd44f92e54627a31b85baf06a68333a196b3d8d241480a774733dcf8b"
+  name = "go.uber.org/zap"
+  packages = [
+    ".",
+    "buffer",
+    "internal/bufferpool",
+    "internal/color",
+    "internal/exit",
+    "zapcore",
+  ]
+  pruneopts = "UT"
+  revision = "ff33455a0e382e8a81d14dd7c922020b6b5e7982"
+  version = "v1.9.1"
+
+[[projects]]
+  branch = "master"
   digest = "1:b06f45abbe7431aec373695c6cf9770a051fa4ac81ad31b3fa73ddf3bb76bb27"
   name = "golang.org/x/crypto"
   packages = [
@@ -1065,11 +1135,12 @@
   version = "kubernetes-1.12.0"
 
 [[projects]]
-  digest = "1:1b756ead87f036cff87cbeeeebc91101e69a7b6ba1589bd974957be242a8f3f3"
+  digest = "1:fba35a0320fd1945f4b55553061c8cf076d75adcc078964914b3550bc3797aaf"
   name = "k8s.io/client-go"
   packages = [
     "discovery",
     "discovery/fake",
+    "dynamic",
     "informers",
     "informers/admissionregistration",
     "informers/admissionregistration/v1alpha1",
@@ -1213,6 +1284,7 @@
     "plugin/pkg/client/auth/exec",
     "rest",
     "rest/watch",
+    "restmapper",
     "testing",
     "tools/auth",
     "tools/cache",
@@ -1287,12 +1359,15 @@
   revision = "f8a0810f38afb8478882b3835a615aebfda39afa"
 
 [[projects]]
-  digest = "1:e2999bf1bb6eddc2a6aa03fe5e6629120a53088926520ca3b4765f77d7ff7eab"
+  digest = "1:26230b05a6dd671721be7c9a58205b0242b701a58437efbb83498bc0db8b2db6"
   name = "k8s.io/klog"
-  packages = ["."]
+  packages = [
+    ".",
+    "klogr",
+  ]
   pruneopts = "UT"
-  revision = "a5bc97fbc634d635061f3146511332c7e313a55a"
-  version = "v0.1.0"
+  revision = "e531227889390a39d9533dde61f590fe9f4b0035"
+  version = "v0.3.0"
 
 [[projects]]
   digest = "1:bcd57f8e20b04c39d15eb74dc2708596f7e2b725c1df4282886f5f0f9b8ece18"
@@ -1389,11 +1464,50 @@
   pruneopts = "UT"
   revision = "8a16e7dd8fb6d97d1331b0c79a16722f934b00b1"
 
+[[projects]]
+  digest = "1:f7b7c5ebb792c2b1cd48b6796009699af4700421dad10ad9c781a854ce56418f"
+  name = "sigs.k8s.io/controller-runtime"
+  packages = [
+    "pkg/builder",
+    "pkg/cache",
+    "pkg/cache/internal",
+    "pkg/client",
+    "pkg/client/apiutil",
+    "pkg/client/config",
+    "pkg/controller",
+    "pkg/event",
+    "pkg/handler",
+    "pkg/internal/controller",
+    "pkg/internal/controller/metrics",
+    "pkg/internal/recorder",
+    "pkg/leaderelection",
+    "pkg/manager",
+    "pkg/metrics",
+    "pkg/patch",
+    "pkg/predicate",
+    "pkg/reconcile",
+    "pkg/recorder",
+    "pkg/runtime/inject",
+    "pkg/runtime/log",
+    "pkg/runtime/scheme",
+    "pkg/runtime/signals",
+    "pkg/source",
+    "pkg/source/internal",
+    "pkg/webhook/admission",
+    "pkg/webhook/admission/types",
+    "pkg/webhook/internal/metrics",
+    "pkg/webhook/types",
+  ]
+  pruneopts = "UT"
+  revision = "12d98582e72927b6cd0123e2b4e819f9341ce62c"
+  version = "v0.1.10"
+
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
   input-imports = [
     "github.com/aws/aws-sdk-go/aws",
+    "github.com/aws/aws-sdk-go/aws/awserr",
     "github.com/aws/aws-sdk-go/aws/credentials",
     "github.com/aws/aws-sdk-go/aws/session",
     "github.com/aws/aws-sdk-go/service/s3",
@@ -1414,6 +1528,10 @@
     "github.com/stretchr/testify/require",
     "github.com/stretchr/testify/suite",
     "github.com/yanniszark/go-nodetool/nodetool",
+    "github.com/yard-turkey/lib-bucket-provisioner/pkg/apis/objectbucket.io/v1alpha1",
+    "github.com/yard-turkey/lib-bucket-provisioner/pkg/provisioner",
+    "github.com/yard-turkey/lib-bucket-provisioner/pkg/provisioner/api",
+    "github.com/yard-turkey/lib-bucket-provisioner/pkg/provisioner/api/errors",
     "k8s.io/api/apps/v1",
     "k8s.io/api/batch/v1",
     "k8s.io/api/core/v1",
