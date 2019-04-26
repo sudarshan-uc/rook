@@ -20,6 +20,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/rook/rook/pkg/operator/ceph/spec"
 	"github.com/rook/rook/pkg/operator/k8sutil"
 	"github.com/rook/rook/tests/framework/clients"
 	"github.com/rook/rook/tests/framework/installer"
@@ -175,23 +176,21 @@ func (s *UpgradeSuite) upgradeCephVersion(filesystemName, objectStoreName string
 	logger.Infof("done updating the CR to nautilus")
 
 	// Confirm that the upgrade was successful
-	// wait for the mds pods to be updated
-	// FIX: Use spec.CephVersionLabelKey
-	CephVersionLabelKey := "ceph-version"
+	// wait for a mon pod to be updated
 	expectedVersion := "14.2.0"
-	err = s.k8sh.WaitForDeploymentLabel(s.namespace, "rook-ceph-mon-a", CephVersionLabelKey, expectedVersion)
+	err = s.k8sh.WaitForDeploymentLabel(s.namespace, "rook-ceph-mon-a", spec.CephVersionLabelKey, expectedVersion)
 	require.Nil(s.T(), err)
 
-	// wait for the rgw pods to be updated
-	err = s.k8sh.WaitForDeploymentLabel(s.namespace, "rook-ceph-osd-0", CephVersionLabelKey, expectedVersion)
+	// wait for an osd pod to be updated
+	err = s.k8sh.WaitForDeploymentLabel(s.namespace, "rook-ceph-osd-0", spec.CephVersionLabelKey, expectedVersion)
 	require.Nil(s.T(), err)
 
-	// wait for the mds pods to be updated
-	err = s.k8sh.WaitForDeploymentLabel(s.namespace, "rook-ceph-mds-"+filesystemName+"-a", CephVersionLabelKey, expectedVersion)
+	// wait for an mds pod to be updated
+	err = s.k8sh.WaitForDeploymentLabel(s.namespace, "rook-ceph-mds-"+filesystemName+"-a", spec.CephVersionLabelKey, expectedVersion)
 	require.Nil(s.T(), err)
 
-	// wait for the rgw pods to be updated
-	err = s.k8sh.WaitForDeploymentLabel(s.namespace, "rook-ceph-rgw-"+objectStoreName, CephVersionLabelKey, expectedVersion)
+	// wait for an rgw pod to be updated
+	err = s.k8sh.WaitForDeploymentLabel(s.namespace, "rook-ceph-rgw-"+objectStoreName, spec.CephVersionLabelKey, expectedVersion)
 	require.Nil(s.T(), err)
 }
 
